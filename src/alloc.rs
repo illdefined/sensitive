@@ -23,9 +23,7 @@ impl Sensitive {
 	}
 
 	unsafe fn mmap_anonymous(size: usize) -> Result<*mut u8, AllocError> {
-		match {
-			libc::mmap(ptr::null_mut(), size, libc::PROT_NONE, libc::MAP_PRIVATE | libc::MAP_ANON, -1, 0)
-		} {
+		match libc::mmap(ptr::null_mut(), size, libc::PROT_NONE, libc::MAP_PRIVATE | libc::MAP_ANON, -1, 0) {
 			libc::MAP_FAILED => Err(AllocError),
 			addr => Ok(addr as *mut u8),
 		}
