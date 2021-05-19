@@ -84,7 +84,22 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn test_vec() {
+	fn test_vec_seq() {
+		const LIMIT: usize = 4194304;
+
+		let mut test: Vec<usize, _> = Vec::new_in(Sensitive);
+
+		for i in 0..LIMIT {
+			test.push(i);
+		}
+
+		for i in 0..LIMIT {
+			assert_eq!(test[i], i);
+		}
+	}
+
+	#[test]
+	fn test_vec_rng() {
 		const LIMIT: usize = 4194304;
 
 		use rand::prelude::*;
