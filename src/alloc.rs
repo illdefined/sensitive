@@ -102,6 +102,33 @@ unsafe impl Allocator for Sensitive {
 			handle_alloc_error(layout);
 		}
 	}
+
+	unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> Result<NonNull<[u8]>, AllocError> {
+		// Refuse allocation if alignment requirement exceeds page size
+		if new.align() >= *PAGE_SIZE {
+			return Err(AllocError);
+		}
+
+		// Zero memory before shrinking
+		Self::clear(ptr.as_ptr().add(new.size()), old.size() - new.size());
+
+		// Unmap pages as needed
+		let size_old = Self::page_align(old.size());
+		let size_new = Self::page_align(new.size());
+
+		if size_old - size_new >= *PAGE_SIZE {
+			let tail = ptr.as_ptr().add(size_new);
+			let diff = size_old - size_new;
+
+			// Unmap pages and protect new guard page
+			if Self::munmap(tail.add(*PAGE_SIZE), diff).is_err()
+				|| Self::mprotect(tail, *PAGE_SIZE, libc::PROT_NONE).is_err() {
+				handle_alloc_error(new);
+			}
+		}
+
+		Ok(NonNull::slice_from_raw_parts(ptr, size_new))
+	}
 }
 
 #[cfg(test)]
@@ -129,6 +156,11 @@ mod tests {
 
 			test.push(rand);
 			assert_eq!(test[i], rand);
+		}
+
+		for _ in 0..4194304 {
+			assert!(test.pop().is_some());
+			test.shrink_to_fit();
 		}
 	}
 }
