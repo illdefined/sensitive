@@ -23,6 +23,8 @@ impl Sensitive {
 	}
 
 	unsafe fn mmap_anonymous(size: usize) -> Result<*mut u8, AllocError> {
+		debug_assert!(size == Self::page_align(size));
+
 		match libc::mmap(ptr::null_mut(), size, libc::PROT_NONE, libc::MAP_PRIVATE | libc::MAP_ANON, -1, 0) {
 			libc::MAP_FAILED => Err(AllocError),
 			addr => Ok(addr as *mut u8),
@@ -30,21 +32,30 @@ impl Sensitive {
 	}
 
 	unsafe fn munmap(addr: *mut u8, size: usize) -> Result<(), AllocError> {
-		match { libc::munmap(addr as *mut c_void, size) } {
+		debug_assert!(addr.align_offset(*PAGE_SIZE) == 0);
+		debug_assert!(size == Self::page_align(size));
+
+		match libc::munmap(addr as *mut c_void, size) {
 			0 => Ok(()),
 			_ => Err(AllocError),
 		}
 	}
 
 	unsafe fn mprotect(addr: *mut u8, size: usize, prot: c_int) -> Result<(), AllocError> {
-		match { libc::mprotect(addr as *mut c_void, size, prot) } {
+		debug_assert!(addr.align_offset(*PAGE_SIZE) == 0);
+		debug_assert!(size == Self::page_align(size));
+
+		match libc::mprotect(addr as *mut c_void, size, prot) {
 			0 => Ok(()),
 			_ => Err(AllocError),
 		}
 	}
 
 	unsafe fn mlock(addr: *mut u8, size: usize) -> Result<(), AllocError> {
-		match { libc::mlock(addr as *mut c_void, size) } {
+		debug_assert!(addr.align_offset(*PAGE_SIZE) == 0);
+		debug_assert!(size == Self::page_align(size));
+
+		match libc::mlock(addr as *mut c_void, size) {
 			0 => Ok(()),
 			_ => Err(AllocError),
 		}
