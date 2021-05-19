@@ -22,8 +22,8 @@ impl Sensitive {
 		Self::align(offset, *PAGE_SIZE)
 	}
 
-	fn mmap_anonymous(size: usize) -> Result<*mut u8, AllocError> {
-		match unsafe {
+	unsafe fn mmap_anonymous(size: usize) -> Result<*mut u8, AllocError> {
+		match {
 			libc::mmap(ptr::null_mut(), size, libc::PROT_NONE, libc::MAP_PRIVATE | libc::MAP_ANON, -1, 0)
 		} {
 			libc::MAP_FAILED => Err(AllocError),
@@ -31,22 +31,22 @@ impl Sensitive {
 		}
 	}
 
-	fn munmap(addr: *mut u8, size: usize) -> Result<(), AllocError> {
-		match unsafe { libc::munmap(addr as *mut c_void, size) } {
+	unsafe fn munmap(addr: *mut u8, size: usize) -> Result<(), AllocError> {
+		match { libc::munmap(addr as *mut c_void, size) } {
 			0 => Ok(()),
 			_ => Err(AllocError),
 		}
 	}
 
-	fn mprotect(addr: *mut u8, size: usize, prot: c_int) -> Result<(), AllocError> {
-		match unsafe { libc::mprotect(addr as *mut c_void, size, prot) } {
+	unsafe fn mprotect(addr: *mut u8, size: usize, prot: c_int) -> Result<(), AllocError> {
+		match { libc::mprotect(addr as *mut c_void, size, prot) } {
 			0 => Ok(()),
 			_ => Err(AllocError),
 		}
 	}
 
-	fn mlock(addr: *mut u8, size: usize) -> Result<(), AllocError> {
-		match unsafe { libc::mlock(addr as *mut c_void, size) } {
+	unsafe fn mlock(addr: *mut u8, size: usize) -> Result<(), AllocError> {
+		match { libc::mlock(addr as *mut c_void, size) } {
 			0 => Ok(()),
 			_ => Err(AllocError),
 		}
@@ -64,15 +64,15 @@ unsafe impl Allocator for Sensitive {
 		let size = Self::page_align(layout.size());
 		let full = size + 2 * *PAGE_SIZE;
 
-		let addr = Self::mmap_anonymous(full)?;
+		let addr = unsafe { Self::mmap_anonymous(full)? };
 		let base = unsafe { addr.add(*PAGE_SIZE) };
 
 		// Attempt to lock memory
-		let _ = Self::mlock(base, size);
+		let _ = unsafe { Self::mlock(base, size) };
 
 		// Allow read‐write access
-		if Self::mprotect(base, size, libc::PROT_READ | libc::PROT_WRITE).is_err() {
-			Self::munmap(addr, full)?;
+		if unsafe { Self::mprotect(base, size, libc::PROT_READ | libc::PROT_WRITE).is_err() } {
+			unsafe { Self::munmap(addr, full)? };
 			return Err(AllocError);
 		}
 
