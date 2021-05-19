@@ -155,19 +155,21 @@ mod tests {
 
 	#[test]
 	fn test_vec() {
+		const LIMIT: usize = 4194304;
+
 		use rand::prelude::*;
 
 		let mut rng = rand::thread_rng();
 		let mut test: Vec<u8, _> = Vec::new_in(Sensitive);
 
-		for i in 0..4194304 {
+		for i in 0..LIMIT {
 			let rand = rng.gen();
 
 			test.push(rand);
 			assert_eq!(test[i], rand);
 		}
 
-		for _ in 0..4194304 {
+		for _ in 0..LIMIT {
 			assert!(test.pop().is_some());
 			test.shrink_to_fit();
 		}
