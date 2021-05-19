@@ -1,70 +1,9 @@
-use libc::c_int;
+use crate::pages::*;
+
 use std::alloc::{Allocator, AllocError, Layout, handle_alloc_error};
-use std::convert::TryInto;
-use std::ffi::c_void;
-use std::ptr::{self, NonNull};
+use std::ptr::NonNull;
 
 pub struct Sensitive;
-
-lazy_static! {
-	static ref PAGE_SIZE: usize = unsafe { libc::sysconf(libc::_SC_PAGE_SIZE).try_into().unwrap() };
-}
-
-impl Sensitive {
-	fn align(offset: usize, align: usize) -> usize {
-		debug_assert!(align != 0 && (align & (align - 1)) == 0);
-
-		(offset + (align - 1)) & !(align - 1)
-	}
-
-	/// Align offset on page boundary
-	fn page_align(offset: usize) -> usize {
-		Self::align(offset, *PAGE_SIZE)
-	}
-
-	unsafe fn mmap_anonymous(size: usize) -> Result<*mut u8, AllocError> {
-		debug_assert!(size == Self::page_align(size));
-
-		match libc::mmap(ptr::null_mut(), size, libc::PROT_NONE, libc::MAP_PRIVATE | libc::MAP_ANON, -1, 0) {
-			libc::MAP_FAILED => Err(AllocError),
-			addr => Ok(addr as *mut u8),
-		}
-	}
-
-	unsafe fn munmap(addr: *mut u8, size: usize) -> Result<(), AllocError> {
-		debug_assert!(addr.align_offset(*PAGE_SIZE) == 0);
-		debug_assert!(size == Self::page_align(size));
-
-		match libc::munmap(addr as *mut c_void, size) {
-			0 => Ok(()),
-			_ => Err(AllocError),
-		}
-	}
-
-	unsafe fn mprotect(addr: *mut u8, size: usize, prot: c_int) -> Result<(), AllocError> {
-		debug_assert!(addr.align_offset(*PAGE_SIZE) == 0);
-		debug_assert!(size == Self::page_align(size));
-
-		match libc::mprotect(addr as *mut c_void, size, prot) {
-			0 => Ok(()),
-			_ => Err(AllocError),
-		}
-	}
-
-	unsafe fn mlock(addr: *mut u8, size: usize) -> Result<(), AllocError> {
-		debug_assert!(addr.align_offset(*PAGE_SIZE) == 0);
-		debug_assert!(size == Self::page_align(size));
-
-		match libc::mlock(addr as *mut c_void, size) {
-			0 => Ok(()),
-			_ => Err(AllocError),
-		}
-	}
-
-	unsafe fn clear(addr: *mut u8, size: usize) {
-		std::intrinsics::volatile_set_memory(addr, 0, size);
-	}
-}
 
 unsafe impl Allocator for Sensitive {
 	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
@@ -74,18 +13,18 @@ unsafe impl Allocator for Sensitive {
 		}
 
 		// Allocate size + two guard pages
-		let size = Self::page_align(layout.size());
+		let size = page_align(layout.size());
 		let full = size + 2 * *PAGE_SIZE;
 
-		let addr = unsafe { Self::mmap_anonymous(full)? };
+		let addr = unsafe { allocate(full, Protection::NoAccess).or(Err(AllocError))? };
 		let base = unsafe { addr.add(*PAGE_SIZE) };
 
 		// Attempt to lock memory
-		let _ = unsafe { Self::mlock(base, size) };
+		let _ = unsafe { lock(base, size) };
 
 		// Allow read‐write access
-		if unsafe { Self::mprotect(base, size, libc::PROT_READ | libc::PROT_WRITE).is_err() } {
-			unsafe { Self::munmap(addr, full)? };
+		if unsafe { protect(base, size, Protection::ReadWrite).is_err() } {
+			let _ = unsafe { release(addr, full) };
 			return Err(AllocError);
 		}
 
@@ -99,15 +38,15 @@ unsafe impl Allocator for Sensitive {
 	unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
 		debug_assert!(layout.align() <= *PAGE_SIZE);
 
-		let size = Self::page_align(layout.size());
+		let size = page_align(layout.size());
 		let full = size + 2 * *PAGE_SIZE;
 
 		// Zero memory before returning to OS
-		Self::clear(ptr.as_ptr(), layout.size());
+		zero(ptr.as_ptr(), layout.size());
 
 		let addr = ptr.as_ptr().sub(*PAGE_SIZE);
 
-		if Self::munmap(addr, full).is_err() {
+		if release(addr, full).is_err() {
 			handle_alloc_error(layout);
 		}
 	}
@@ -119,19 +58,19 @@ unsafe impl Allocator for Sensitive {
 		}
 
 		// Zero memory before shrinking
-		Self::clear(ptr.as_ptr().add(new.size()), old.size() - new.size());
+		zero(ptr.as_ptr().add(new.size()), old.size() - new.size());
 
-		// Unmap pages as needed
-		let size_old = Self::page_align(old.size());
-		let size_new = Self::page_align(new.size());
+		// Uncommit pages as needed
+		let size_old = page_align(old.size());
+		let size_new = page_align(new.size());
 
 		if size_old - size_new >= *PAGE_SIZE {
 			let tail = ptr.as_ptr().add(size_new);
 			let diff = size_old - size_new;
 
-			// Unmap pages and protect new guard page
-			if Self::munmap(tail.add(*PAGE_SIZE), diff).is_err()
-				|| Self::mprotect(tail, *PAGE_SIZE, libc::PROT_NONE).is_err() {
+			// Uncommit pages and protect new guard page
+			if uncommit(tail.add(*PAGE_SIZE), diff).is_err()
+				|| protect(tail, *PAGE_SIZE, Protection::NoAccess).is_err() {
 				handle_alloc_error(new);
 			}
 		}
@@ -143,15 +82,6 @@ unsafe impl Allocator for Sensitive {
 #[cfg(test)]
 mod tests {
 	use super::*;
-
-	#[test]
-	fn align() {
-		assert_eq!(Sensitive::align(0, 4096), 0);
-
-		for i in 1..4096 {
-			assert_eq!(Sensitive::align(i, 4096), 4096);
-		}
-	}
 
 	#[test]
 	fn test_vec() {
