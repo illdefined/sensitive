@@ -51,6 +51,10 @@ impl Sensitive {
 			_ => Err(AllocError),
 		}
 	}
+
+	unsafe fn clear(addr: *mut u8, size: usize) {
+		std::intrinsics::volatile_set_memory(addr, 0, size);
+	}
 }
 
 unsafe impl Allocator for Sensitive {
@@ -90,7 +94,7 @@ unsafe impl Allocator for Sensitive {
 		let full = size + 2 * *PAGE_SIZE;
 
 		// Zero memory before returning to OS
-		std::intrinsics::volatile_set_memory(ptr.as_ptr(), 0, layout.size());
+		Self::clear(ptr.as_ptr(), layout.size());
 
 		let addr = ptr.as_ptr().sub(*PAGE_SIZE);
 
