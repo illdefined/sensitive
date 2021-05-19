@@ -3,4 +3,4 @@
 #[macro_use]
 extern crate lazy_static;
 
-mod alloc;
+pub mod alloc;
