@@ -202,6 +202,14 @@ mod tests {
 	use super::*;
 
 	#[test]
+	fn test_page_size() {
+		assert!(is_power_of_two(*PAGE_SIZE));
+
+		// No modern architecture has a page size < 4096 bytes
+		assert!(*PAGE_SIZE >= 4096);
+	}
+
+	#[test]
 	fn test_is_power_of_two() {
 		let mut p = 2;
 
