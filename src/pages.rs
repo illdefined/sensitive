@@ -240,4 +240,36 @@ mod tests {
 			assert_eq!(align(i, 4096), 4096);
 		}
 	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_protection() {
+		use bulletproof::Bulletproof;
+
+		let size = *GRANULARITY;
+		let bp = unsafe { Bulletproof::new() };
+		let buf = unsafe { allocate(size, Protection::NoAccess) }.unwrap();
+
+		for i in 0..size {
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Err(()));
+			assert_eq!(unsafe { bp.store(buf.add(i), &0xff) }, Err(()));
+		}
+
+		unsafe { protect(buf, size, Protection::ReadOnly) }.unwrap();
+
+		for i in 0..size {
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Ok(0));
+			assert_eq!(unsafe { bp.store(buf.add(i), &0x55) }, Err(()));
+		}
+
+		unsafe { protect(buf, size, Protection::ReadWrite) }.unwrap();
+
+		for i in 0..size {
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Ok(0));
+			assert_eq!(unsafe { bp.store(buf.add(i), &0x55) }, Ok(()));
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Ok(0x55));
+		}
+
+		unsafe { release(buf, size) }.unwrap();
+	}
 }
