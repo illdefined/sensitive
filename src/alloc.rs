@@ -83,6 +83,71 @@ unsafe impl Allocator for Sensitive {
 mod tests {
 	use super::*;
 
+	fn test_raw_range(range: std::ops::Range<usize>, samples: usize) {
+		use rand::distributions::{Distribution, Uniform};
+
+		let mut rng = rand::thread_rng();
+		let dist = Uniform::from(range);
+
+		for _ in 0..samples {
+			let size = dist.sample(&mut rng);
+			let layout = Layout::from_size_align(size, 1).unwrap();
+			let alloc = Sensitive.allocate(layout).unwrap();
+
+			for i in 0..size {
+				let ptr = unsafe { alloc.cast::<u8>().as_ptr().add(i) };
+				assert_eq!(unsafe { ptr.read() }, 0);
+				unsafe { ptr.write(0x55) };
+				assert_eq!(unsafe { ptr.read() }, 0x55);
+			}
+
+			unsafe { Sensitive.deallocate(alloc.cast::<u8>(), layout); }
+		}
+	}
+
+	#[test]
+	fn test_raw_tiny() {
+		test_raw_range(0..4096, 4096);
+	}
+
+	#[test]
+	fn test_raw_small() {
+		test_raw_range(4096..65536, 256);
+	}
+
+	#[test]
+	fn test_raw_medium() {
+		test_raw_range(65536..4194304, 64);
+	}
+
+	#[test]
+	fn test_raw_large() {
+		test_raw_range(4194304..16777216, 16);
+	}
+
+	#[test]
+	fn test_raw_huge() {
+		test_raw_range(4194304..268435456, 4);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_raw_guard() {
+		use bulletproof::Bulletproof;
+
+		const SIZE: usize = 4194304;
+
+		let bp = unsafe { Bulletproof::new() };
+		let layout = Layout::from_size_align(SIZE, 1).unwrap();
+		let alloc = Sensitive.allocate(layout).unwrap();
+		let ptr = alloc.cast::<u8>().as_ptr();
+
+		assert_eq!(unsafe { bp.load(ptr.sub(1)) }, Err(()));
+		assert_eq!(unsafe { bp.load(ptr) }, Ok(0));
+		assert_eq!(unsafe { bp.load(ptr.add(SIZE - 1)) }, Ok(0));
+		assert_eq!(unsafe { bp.load(ptr.add(SIZE)) }, Err(()));
+	}
+
 	#[test]
 	fn test_vec_seq() {
 		const LIMIT: usize = 4194304;
@@ -100,9 +165,9 @@ mod tests {
 
 	#[test]
 	fn test_vec_rng() {
-		const LIMIT: usize = 4194304;
-
 		use rand::prelude::*;
+
+		const LIMIT: usize = 4194304;
 
 		let mut rng = rand::thread_rng();
 		let mut test: Vec<u8, _> = Vec::new_in(Sensitive);
