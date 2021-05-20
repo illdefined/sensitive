@@ -7,17 +7,17 @@ pub struct Sensitive;
 
 unsafe impl Allocator for Sensitive {
 	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-		// Refuse allocation if alignment requirement exceeds page size
-		if layout.align() >= *PAGE_SIZE {
+		// Refuse allocation if alignment requirement exceeds allocation granularity
+		if layout.align() >= *GRANULARITY {
 			return Err(AllocError);
 		}
 
-		// Allocate size + two guard pages
-		let size = page_align(layout.size());
-		let full = size + 2 * *PAGE_SIZE;
+		// Allocate size + two guard allocations
+		let size = alloc_align(layout.size());
+		let full = size + 2 * *GRANULARITY;
 
 		let addr = unsafe { allocate(full, Protection::NoAccess).or(Err(AllocError))? };
-		let base = unsafe { addr.add(*PAGE_SIZE) };
+		let base = unsafe { addr.add(*GRANULARITY) };
 
 		// Attempt to lock memory
 		let _ = unsafe { lock(base, size) };
@@ -36,15 +36,15 @@ unsafe impl Allocator for Sensitive {
 	}
 
 	unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-		debug_assert!(layout.align() <= *PAGE_SIZE);
+		debug_assert!(layout.align() <= *GRANULARITY);
 
-		let size = page_align(layout.size());
-		let full = size + 2 * *PAGE_SIZE;
+		let size = alloc_align(layout.size());
+		let full = size + 2 * *GRANULARITY;
 
 		// Zero memory before returning to OS
 		zero(ptr.as_ptr(), layout.size());
 
-		let addr = ptr.as_ptr().sub(*PAGE_SIZE);
+		let addr = ptr.as_ptr().sub(*GRANULARITY);
 
 		if release(addr, full).is_err() {
 			handle_alloc_error(layout);
@@ -52,8 +52,8 @@ unsafe impl Allocator for Sensitive {
 	}
 
 	unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> Result<NonNull<[u8]>, AllocError> {
-		// Refuse allocation if alignment requirement exceeds page size
-		if new.align() >= *PAGE_SIZE {
+		// Refuse allocation if alignment requirement exceeds allocation granularity
+		if new.align() >= *GRANULARITY {
 			return Err(AllocError);
 		}
 
@@ -61,16 +61,16 @@ unsafe impl Allocator for Sensitive {
 		zero(ptr.as_ptr().add(new.size()), old.size() - new.size());
 
 		// Uncommit pages as needed
-		let size_old = page_align(old.size());
-		let size_new = page_align(new.size());
+		let size_old = alloc_align(old.size());
+		let size_new = alloc_align(new.size());
 
-		if size_old - size_new >= *PAGE_SIZE {
+		if size_old - size_new >= *GRANULARITY {
 			let tail = ptr.as_ptr().add(size_new);
 			let diff = size_old - size_new;
 
-			// Uncommit pages and protect new guard page
-			if uncommit(tail.add(*PAGE_SIZE), diff).is_err()
-				|| protect(tail, *PAGE_SIZE, Protection::NoAccess).is_err() {
+			// Uncommit pages and protect new guard allocation
+			if uncommit(tail.add(*GRANULARITY), diff).is_err()
+				|| protect(tail, *GRANULARITY, Protection::NoAccess).is_err() {
 				handle_alloc_error(new);
 			}
 		}

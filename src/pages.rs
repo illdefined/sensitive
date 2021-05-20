@@ -7,10 +7,10 @@ use winapi::um::winnt;
 
 #[cfg(unix)]
 lazy_static! {
-	pub static ref PAGE_SIZE: usize = {
-		use libc::{sysconf, _SC_PAGE_SIZE};
+	pub static ref GRANULARITY: usize = {
+		use libc::{sysconf, _SC_PAGESIZE};
 
-		let pg = unsafe { sysconf(_SC_PAGE_SIZE) };
+		let pg = unsafe { sysconf(_SC_PAGESIZE) };
 		assert!(pg > 0);
 
 		pg.try_into().unwrap()
@@ -19,13 +19,13 @@ lazy_static! {
 
 #[cfg(windows)]
 lazy_static! {
-	pub static ref PAGE_SIZE: usize = {
+	pub static ref GRANULARITY: usize = {
 		use std::mem::MaybeUninit;
 		use winapi::um::sysinfoapi::{SYSTEM_INFO, GetSystemInfo};
 
 		let mut si = MaybeUninit::<SYSTEM_INFO>::uninit();
 		unsafe { GetSystemInfo(si.as_mut_ptr()); }
-		unsafe { si.assume_init() }.dwPageSize.try_into().unwrap()
+		unsafe { si.assume_init() }.dwAllocationGranularity.try_into().unwrap()
 	};
 }
 
@@ -55,8 +55,8 @@ pub fn align(offset: usize, align: usize) -> usize {
 	(offset + (align - 1)) & !(align - 1)
 }
 
-pub fn page_align(offset: usize) -> usize {
-	align(offset, *PAGE_SIZE)
+pub fn alloc_align(offset: usize) -> usize {
+	align(offset, *GRANULARITY)
 }
 
 pub unsafe fn zero(addr: *mut u8, size: usize) {
@@ -202,11 +202,11 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn test_page_size() {
-		assert!(is_power_of_two(*PAGE_SIZE));
+	fn test_alloc_size() {
+		assert!(is_power_of_two(*GRANULARITY));
 
 		// No modern architecture has a page size < 4096 bytes
-		assert!(*PAGE_SIZE >= 4096);
+		assert!(*GRANULARITY >= 4096);
 	}
 
 	#[test]
