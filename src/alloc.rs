@@ -155,6 +155,8 @@ mod tests {
 		for i in size + 1 .. *GRANULARITY {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
+
+		unsafe { Sensitive.deallocate(alloc.cast::<u8>(), layout); }
 	}
 
 	#[test]
