@@ -135,17 +135,26 @@ mod tests {
 	fn test_raw_guard() {
 		use bulletproof::Bulletproof;
 
-		const SIZE: usize = 4194304;
+		let size = alloc_align(4194304);
 
 		let bp = unsafe { Bulletproof::new() };
-		let layout = Layout::from_size_align(SIZE, 1).unwrap();
+		let layout = Layout::from_size_align(size, 1).unwrap();
 		let alloc = Sensitive.allocate(layout).unwrap();
 		let ptr = alloc.cast::<u8>().as_ptr();
 
-		assert_eq!(unsafe { bp.load(ptr.sub(1)) }, Err(()));
-		assert_eq!(unsafe { bp.load(ptr) }, Ok(0));
-		assert_eq!(unsafe { bp.load(ptr.add(SIZE - 1)) }, Ok(0));
-		assert_eq!(unsafe { bp.load(ptr.add(SIZE)) }, Err(()));
+		// Preceding guard
+		for i in 1..=*GRANULARITY {
+			assert_eq!(unsafe { bp.load(ptr.sub(i)) }, Err(()));
+		}
+
+		for i in 0..size {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
+		}
+
+		// Trailing guard
+		for i in size + 1 .. *GRANULARITY {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
+		}
 	}
 
 	#[test]
