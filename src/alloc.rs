@@ -159,6 +159,47 @@ mod tests {
 		unsafe { Sensitive.deallocate(alloc.cast::<u8>(), layout); }
 	}
 
+	#[cfg(unix)]
+	#[test]
+	fn test_raw_shrink() {
+		use bulletproof::Bulletproof;
+
+		let size = 2 * *GRANULARITY;
+
+		let bp = unsafe { Bulletproof::new() };
+		let layout_0 = Layout::from_size_align(size, 1).unwrap();
+		let alloc_0 = Sensitive.allocate(layout_0).unwrap();
+		let ptr = alloc_0.cast::<u8>().as_ptr();
+
+		for i in 0..size {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
+		}
+
+		// Original guard
+		for i in size + 1 .. *GRANULARITY {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
+		}
+
+		let layout_1 = Layout::from_size_align(size / 2, 1).unwrap();
+		let alloc_1 = unsafe {
+			Sensitive.shrink(alloc_0.cast::<u8>(), layout_0, layout_1)
+		}.unwrap();
+
+		// Allocation should not move
+		assert_eq!(alloc_0.cast::<u8>(), alloc_1.cast::<u8>());
+
+		for i in 0 .. size / 2 {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
+		}
+
+		// New guard
+		for i in size / 2 + 1 .. *GRANULARITY {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
+		}
+
+		unsafe { Sensitive.deallocate(alloc_1.cast::<u8>(), layout_1); }
+	}
+
 	#[test]
 	fn test_vec_seq() {
 		const LIMIT: usize = 4194304;
