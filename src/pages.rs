@@ -339,4 +339,32 @@ mod tests {
 
 		unsafe { release(buf, size) }.unwrap();
 	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_uncommit() {
+		use bulletproof::Bulletproof;
+
+		let size = std::cmp::max(granularity(), 2 * page_size());
+		let bp = unsafe { Bulletproof::new() };
+		let buf = unsafe { allocate(size, Protection::ReadWrite) }.unwrap();
+
+		for i in 0..size {
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Ok(0));
+			assert_eq!(unsafe { bp.store(buf.add(i), &0x55) }, Ok(()));
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Ok(0x55));
+		}
+
+		unsafe { uncommit(buf.add(size - page_size()), page_size()) }.unwrap();
+
+		for i in 0 .. size - page_size() {
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Ok(0x55));
+		}
+
+		for i in size - page_size() + 1 .. size {
+			assert_eq!(unsafe { bp.load(buf.add(i)) }, Err(()));
+		}
+
+		unsafe { release(buf, size - page_size()) }.unwrap();
+	}
 }
