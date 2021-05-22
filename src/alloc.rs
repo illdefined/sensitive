@@ -7,17 +7,17 @@ pub struct Sensitive;
 
 unsafe impl Allocator for Sensitive {
 	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-		// Refuse allocation if alignment requirement exceeds allocation granularity
-		if layout.align() >= *GRANULARITY {
+		// Refuse allocation if alignment requirement exceeds page size
+		if layout.align() >= page_size() {
 			return Err(AllocError);
 		}
 
-		// Allocate size + two guard allocations
-		let size = alloc_align(layout.size());
-		let full = size + 2 * *GRANULARITY;
+		// Allocate size + two guard pages
+		let full = alloc_align(layout.size() + 2 * page_size());
+		let size = full - 2 * page_size();
 
 		let addr = unsafe { allocate(full, Protection::NoAccess).or(Err(AllocError))? };
-		let base = unsafe { addr.add(*GRANULARITY) };
+		let base = unsafe { addr.add(page_size()) };
 
 		if size > 0 {
 			// Attempt to lock memory
@@ -38,15 +38,14 @@ unsafe impl Allocator for Sensitive {
 	}
 
 	unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-		debug_assert!(layout.align() <= *GRANULARITY);
+		debug_assert!(layout.align() <= page_size());
 
-		let size = alloc_align(layout.size());
-		let full = size + 2 * *GRANULARITY;
+		let full = alloc_align(layout.size() + 2 * page_size());
 
 		// Zero memory before returning to OS
 		zero(ptr.as_ptr(), layout.size());
 
-		let addr = ptr.as_ptr().sub(*GRANULARITY);
+		let addr = ptr.as_ptr().sub(page_size());
 
 		if release(addr, full).is_err() {
 			handle_alloc_error(layout);
@@ -54,8 +53,8 @@ unsafe impl Allocator for Sensitive {
 	}
 
 	unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> Result<NonNull<[u8]>, AllocError> {
-		// Refuse allocation if alignment requirement exceeds allocation granularity
-		if new.align() >= *GRANULARITY {
+		// Refuse allocation if alignment requirement exceeds page size
+		if new.align() >= page_size() {
 			return Err(AllocError);
 		}
 
@@ -65,16 +64,16 @@ unsafe impl Allocator for Sensitive {
 		zero(ptr.as_ptr().add(new.size()), old.size() - new.size());
 
 		// Uncommit pages as needed
-		let size_old = alloc_align(old.size());
-		let size_new = alloc_align(new.size());
+		let size_old = page_align(old.size());
+		let size_new = page_align(new.size());
 
-		if size_old - size_new >= *GRANULARITY {
+		if size_old - size_new >= page_size() {
 			let tail = ptr.as_ptr().add(size_new);
 			let diff = size_old - size_new;
 
-			// Uncommit pages and protect new guard allocation
-			if uncommit(tail.add(*GRANULARITY), diff).is_err()
-				|| protect(tail, *GRANULARITY, Protection::NoAccess).is_err() {
+			// Uncommit pages and protect new guard page
+			if uncommit(tail.add(page_size()), diff).is_err()
+				|| protect(tail, page_size(), Protection::NoAccess).is_err() {
 				handle_alloc_error(new);
 			}
 		}
@@ -150,7 +149,7 @@ mod tests {
 		let ptr = alloc.cast::<u8>().as_ptr();
 
 		// Preceding guard
-		for i in 1..=*GRANULARITY {
+		for i in 1..=page_size() {
 			assert_eq!(unsafe { bp.load(ptr.sub(i)) }, Err(()));
 		}
 
@@ -159,7 +158,7 @@ mod tests {
 		}
 
 		// Trailing guard
-		for i in size + 1 .. *GRANULARITY {
+		for i in size + 1 .. page_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 
@@ -171,7 +170,7 @@ mod tests {
 	fn test_raw_shrink() {
 		use bulletproof::Bulletproof;
 
-		let size = 2 * *GRANULARITY;
+		let size = granularity() + page_size();
 
 		let bp = unsafe { Bulletproof::new() };
 		let layout_0 = Layout::from_size_align(size, 1).unwrap();
@@ -183,11 +182,11 @@ mod tests {
 		}
 
 		// Original guard
-		for i in size + 1 .. *GRANULARITY {
+		for i in size + 1 .. page_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 
-		let layout_1 = Layout::from_size_align(size / 2, 1).unwrap();
+		let layout_1 = Layout::from_size_align(size - page_size(), 1).unwrap();
 		let alloc_1 = unsafe {
 			Sensitive.shrink(alloc_0.cast::<u8>(), layout_0, layout_1)
 		}.unwrap();
@@ -200,7 +199,7 @@ mod tests {
 		}
 
 		// New guard
-		for i in size / 2 + 1 .. *GRANULARITY {
+		for i in size / 2 + 1 .. page_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 

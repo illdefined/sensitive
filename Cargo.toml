@@ -9,9 +9,6 @@ license = "MirOS"
 keywords = [ "security" ]
 categories = [ "memory-management" ]
 
-[dependencies]
-lazy_static = "1.4"
-
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
