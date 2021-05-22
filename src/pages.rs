@@ -68,6 +68,8 @@ pub unsafe fn allocate(size: usize, prot: Protection) -> Result<*mut u8, Error> 
 	use libc::{mmap, MAP_PRIVATE, MAP_ANON, MAP_FAILED};
 	use std::os::raw::c_int;
 
+	debug_assert_eq!(alloc_align(size), size);
+
 	match mmap(ptr::null_mut(), size, prot as c_int, MAP_PRIVATE | MAP_ANON, -1, 0) {
 		MAP_FAILED => Err(Error::last_os_error()),
 		addr => Ok(addr as *mut u8),
@@ -80,6 +82,8 @@ pub unsafe fn allocate(size: usize, prot: Protection) -> Result<*mut u8, Error> 
 	use winapi::shared::ntdef::NULL;
 	use winapi::um::memoryapi::VirtualAlloc;
 	use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE};
+
+	debug_assert_eq!(alloc_align(size), size);
 
 	match VirtualAlloc(ptr::null_mut(), size, MEM_COMMIT | MEM_RESERVE, prot as DWORD) {
 		NULL => Err(Error::last_os_error()),
@@ -98,6 +102,9 @@ pub unsafe fn uncommit(addr: *mut u8, size: usize) -> Result<(), Error> {
 	use winapi::um::memoryapi::VirtualFree;
 	use winapi::um::winnt::MEM_DECOMMIT;
 
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
+
 	match VirtualFree(addr as *mut c_void, size, MEM_DECOMMIT) {
 		0 => Err(Error::last_os_error()),
 		_ => Ok(()),
@@ -109,6 +116,9 @@ pub unsafe fn release(addr: *mut u8, size: usize) -> Result<(), Error> {
 	use libc::munmap;
 	use std::ffi::c_void;
 
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
+
 	match munmap(addr as *mut c_void, size) {
 		0 => Ok(()),
 		_ => Err(Error::last_os_error()),
@@ -116,10 +126,13 @@ pub unsafe fn release(addr: *mut u8, size: usize) -> Result<(), Error> {
 }
 
 #[cfg(windows)]
-pub unsafe fn release(addr: *mut u8, _size: usize) -> Result<(), Error> {
+pub unsafe fn release(addr: *mut u8, size: usize) -> Result<(), Error> {
 	use winapi::ctypes::c_void;
 	use winapi::um::memoryapi::VirtualFree;
 	use winapi::um::winnt::MEM_RELEASE;
+
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
 
 	match VirtualFree(addr as *mut c_void, 0, MEM_RELEASE) {
 		0 => Err(Error::last_os_error()),
@@ -132,6 +145,9 @@ pub unsafe fn protect(addr: *mut u8, size: usize, prot: Protection) -> Result<()
 	use libc::mprotect;
 	use std::ffi::c_void;
 	use std::os::raw::c_int;
+
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
 
 	match mprotect(addr as *mut c_void, size, prot as c_int) {
 		0 => Ok(()),
@@ -146,6 +162,9 @@ pub unsafe fn protect(addr: *mut u8, size: usize, prot: Protection) -> Result<()
 	use winapi::shared::minwindef::DWORD;
 	use winapi::um::memoryapi::VirtualProtect;
 
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
+
 	let mut old = MaybeUninit::<DWORD>::uninit();
 	match VirtualProtect(addr as *mut c_void, size, prot as DWORD, old.as_mut_ptr()) {
 		0 => Err(Error::last_os_error()),
@@ -158,6 +177,9 @@ pub unsafe fn lock(addr: *mut u8, size: usize) -> Result<(), Error> {
 	use libc::mlock;
 	use std::ffi::c_void;
 
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
+
 	match mlock(addr as *mut c_void, size) {
 		0 => Ok(()),
 		_ => Err(Error::last_os_error()),
@@ -168,6 +190,9 @@ pub unsafe fn lock(addr: *mut u8, size: usize) -> Result<(), Error> {
 pub unsafe fn lock(addr: *mut u8, size: usize) -> Result<(), Error> {
 	use winapi::ctypes::c_void;
 	use winapi::um::memoryapi::VirtualLock;
+
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
 
 	match VirtualLock(addr as *mut c_void, size) {
 		0 => Err(Error::last_os_error()),
@@ -180,6 +205,9 @@ pub unsafe fn unlock(addr: *mut u8, size: usize) -> Result<(), Error> {
 	use libc::munlock;
 	use std::ffi::c_void;
 
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
+
 	match munlock(addr as *mut c_void, size) {
 		0 => Ok(()),
 		_ => Err(Error::last_os_error()),
@@ -190,6 +218,9 @@ pub unsafe fn unlock(addr: *mut u8, size: usize) -> Result<(), Error> {
 pub unsafe fn unlock(addr: *mut u8, size: usize) -> Result<(), Error> {
 	use winapi::ctypes::c_void;
 	use winapi::um::memoryapi::VirtualUnlock;
+
+	debug_assert_eq!(addr.align_offset(*GRANULARITY), 0);
+	debug_assert_eq!(alloc_align(size), size);
 
 	match VirtualUnlock(addr as *mut c_void, size) {
 		0 => Err(Error::last_os_error()),
