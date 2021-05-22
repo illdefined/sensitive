@@ -5,6 +5,14 @@ use std::ptr::NonNull;
 
 pub struct Sensitive;
 
+impl Sensitive {
+	pub const GUARD_PAGES: usize = 1;
+
+	pub fn guard_size() -> usize {
+		Self::GUARD_PAGES * page_size()
+	}
+}
+
 unsafe impl Allocator for Sensitive {
 	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
 		// Refuse allocation if alignment requirement exceeds page size
@@ -13,11 +21,11 @@ unsafe impl Allocator for Sensitive {
 		}
 
 		// Allocate size + two guard pages
-		let full = alloc_align(layout.size() + 2 * page_size());
-		let size = full - 2 * page_size();
+		let full = alloc_align(layout.size() + 2 * Self::guard_size());
+		let size = full - 2 * Self::guard_size();
 
 		let addr = unsafe { allocate(full, Protection::NoAccess).or(Err(AllocError))? };
-		let base = unsafe { addr.add(page_size()) };
+		let base = unsafe { addr.add(Self::guard_size()) };
 
 		if size > 0 {
 			// Attempt to lock memory
@@ -40,12 +48,12 @@ unsafe impl Allocator for Sensitive {
 	unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
 		debug_assert!(layout.align() <= page_size());
 
-		let full = alloc_align(layout.size() + 2 * page_size());
+		let full = alloc_align(layout.size() + 2 * Self::guard_size());
 
 		// Zero memory before returning to OS
 		zero(ptr.as_ptr(), layout.size());
 
-		let addr = ptr.as_ptr().sub(page_size());
+		let addr = ptr.as_ptr().sub(Self::guard_size());
 
 		if release(addr, full).is_err() {
 			handle_alloc_error(layout);
@@ -72,8 +80,8 @@ unsafe impl Allocator for Sensitive {
 			let diff = size_old - size_new;
 
 			// Uncommit pages and protect new guard page
-			if uncommit(tail.add(page_size()), diff).is_err()
-				|| protect(tail, page_size(), Protection::NoAccess).is_err() {
+			if uncommit(tail.add(Self::guard_size()), diff).is_err()
+				|| protect(tail, Self::guard_size(), Protection::NoAccess).is_err() {
 				handle_alloc_error(new);
 			}
 		}
@@ -149,7 +157,7 @@ mod tests {
 		let ptr = alloc.cast::<u8>().as_ptr();
 
 		// Preceding guard
-		for i in 1..=page_size() {
+		for i in 1..=Sensitive::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.sub(i)) }, Err(()));
 		}
 
@@ -158,7 +166,7 @@ mod tests {
 		}
 
 		// Trailing guard
-		for i in size + 1 .. page_size() {
+		for i in size + 1 .. Sensitive::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 
@@ -170,7 +178,7 @@ mod tests {
 	fn test_raw_shrink() {
 		use bulletproof::Bulletproof;
 
-		let size = granularity() + page_size();
+		let size = granularity() + Sensitive::guard_size();
 
 		let bp = unsafe { Bulletproof::new() };
 		let layout_0 = Layout::from_size_align(size, 1).unwrap();
@@ -182,11 +190,11 @@ mod tests {
 		}
 
 		// Original guard
-		for i in size + 1 .. page_size() {
+		for i in size + 1 .. Sensitive::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 
-		let layout_1 = Layout::from_size_align(size - page_size(), 1).unwrap();
+		let layout_1 = Layout::from_size_align(size - Sensitive::guard_size(), 1).unwrap();
 		let alloc_1 = unsafe {
 			Sensitive.shrink(alloc_0.cast::<u8>(), layout_0, layout_1)
 		}.unwrap();
@@ -199,7 +207,7 @@ mod tests {
 		}
 
 		// New guard
-		for i in size / 2 + 1 .. page_size() {
+		for i in size / 2 + 1 .. Sensitive::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 
