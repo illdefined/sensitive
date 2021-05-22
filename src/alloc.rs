@@ -59,6 +59,8 @@ unsafe impl Allocator for Sensitive {
 			return Err(AllocError);
 		}
 
+		debug_assert!(new.size() < old.size());
+
 		// Zero memory before shrinking
 		zero(ptr.as_ptr().add(new.size()), old.size() - new.size());
 
