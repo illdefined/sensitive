@@ -91,6 +91,9 @@ mod tests {
 
 		for _ in 0..samples {
 			let size = dist.sample(&mut rng);
+
+			eprintln!("Allocating {} bytes", size);
+
 			let layout = Layout::from_size_align(size, 1).unwrap();
 			let alloc = Sensitive.allocate(layout).unwrap();
 
