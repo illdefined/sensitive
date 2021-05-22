@@ -19,13 +19,15 @@ unsafe impl Allocator for Sensitive {
 		let addr = unsafe { allocate(full, Protection::NoAccess).or(Err(AllocError))? };
 		let base = unsafe { addr.add(*GRANULARITY) };
 
-		// Attempt to lock memory
-		let _ = unsafe { lock(base, size) };
+		if size > 0 {
+			// Attempt to lock memory
+			let _ = unsafe { lock(base, size) };
 
-		// Allow read‐write access
-		if unsafe { protect(base, size, Protection::ReadWrite).is_err() } {
-			let _ = unsafe { release(addr, full) };
-			return Err(AllocError);
+			// Allow read‐write access
+			if unsafe { protect(base, size, Protection::ReadWrite).is_err() } {
+				let _ = unsafe { release(addr, full) };
+				return Err(AllocError);
+			}
 		}
 
 		Ok(NonNull::slice_from_raw_parts(unsafe { NonNull::new_unchecked(base) }, size))
