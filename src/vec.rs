@@ -2,7 +2,6 @@ use crate::alloc::Sensitive;
 use crate::pages::{Protection, page_align, protect, zero};
 use crate::refs::RefCount;
 
-use std::cell::Cell;
 use std::cmp::PartialEq;
 use std::default::Default;
 use std::fmt;
@@ -10,7 +9,7 @@ use std::ops::{Deref, DerefMut, Drop};
 
 pub struct Vec<T> {
 	vec: std::vec::Vec<T, Sensitive>,
-	refs: Cell<RefCount>
+	refs: RefCount
 }
 
 #[derive(Debug)]
@@ -53,7 +52,7 @@ impl<T> Vec<T> {
 	pub fn new() -> Self {
 		let outer = Self {
 			vec: std::vec::Vec::new_in(Sensitive),
-			refs: Cell::new(RefCount::default())
+			refs: RefCount::default()
 		};
 
 		debug_assert!(outer.capacity() == 0);
@@ -64,7 +63,7 @@ impl<T> Vec<T> {
 	fn with_capacity_unprotected(capacity: usize) -> Self {
 		Self {
 			vec: std::vec::Vec::with_capacity_in(capacity, Sensitive),
-			refs: Cell::new(RefCount::default())
+			refs: RefCount::default()
 		}
 	}
 
@@ -76,16 +75,13 @@ impl<T> Vec<T> {
 	}
 
 	pub fn borrow(&self) -> Ref<'_, T> {
-		if self.refs.update(|refs| refs.acquire()).get() == 1 {
-			self.protect(Protection::ReadOnly).unwrap();
-		}
+		self.refs.acquire(|| self.protect(Protection::ReadOnly).unwrap());
 
 		Ref(self)
 	}
 
 	pub fn borrow_mut(&mut self) -> RefMut<'_, T> {
-		self.refs.update(|refs| refs.acquire_mut());
-		self.protect(Protection::ReadWrite).unwrap();
+		self.refs.acquire_mut(|| self.protect(Protection::ReadWrite).unwrap());
 
 		RefMut(self)
 	}
@@ -96,18 +92,12 @@ impl<T> Vec<T> {
 
 	pub fn reserve(&mut self, capacity: usize) {
 		self.vec.reserve(capacity);
-
-		if self.refs.get().get() == 0 {
-			self.protect(Protection::NoAccess).unwrap();
-		}
+		self.refs.mutate(|| self.protect(Protection::NoAccess).unwrap());
 	}
 
 	pub fn reserve_exact(&mut self, capacity: usize) {
 		self.vec.reserve_exact(capacity);
-
-		if self.refs.get().get() == 0 {
-			self.protect(Protection::NoAccess).unwrap();
-		}
+		self.refs.mutate(|| self.protect(Protection::NoAccess).unwrap());
 	}
 
 	pub fn len(&self) -> usize {
@@ -251,9 +241,9 @@ impl PartialEq<&str> for Ref<'_, u8> {
 
 impl<T> Drop for Ref<'_, T> {
 	fn drop(&mut self) {
-		if self.0.refs.update(|refs| refs.release()).get() == 0 {
-			self.0.protect(Protection::NoAccess).unwrap();
-		}
+		self.0.refs.release(
+			|| self.0.protect(Protection::NoAccess).unwrap(),
+			|| self.0.protect(Protection::ReadOnly).unwrap());
 	}
 }
 
@@ -315,10 +305,7 @@ impl PartialEq<&str> for RefMut<'_, u8> {
 
 impl<T> Drop for RefMut<'_, T> {
 	fn drop(&mut self) {
-		self.0.protect(match self.0.refs.update(|refs| refs.release_mut()).get() {
-			0 => Protection::NoAccess,
-			_ => Protection::ReadOnly
-		}).unwrap();
+		self.0.refs.release_mut(|| self.0.protect(Protection::NoAccess).unwrap());
 	}
 }
 

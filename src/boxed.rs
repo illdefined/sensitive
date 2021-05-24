@@ -2,14 +2,13 @@ use crate::alloc::Sensitive;
 use crate::pages::{Protection, page_align, protect, zero};
 use crate::refs::RefCount;
 
-use std::cell::Cell;
 use std::default::Default;
 use std::fmt;
 use std::ops::{Deref, DerefMut, Drop};
 
 pub struct Box<T> {
 	boxed: std::boxed::Box<T, Sensitive>,
-	refs: Cell<RefCount>
+	refs: RefCount
 }
 
 #[derive(Debug)]
@@ -36,7 +35,7 @@ impl<T> Box<T> {
 	fn new_without_clear(source: T) -> Self {
 		let outer = Self {
 			boxed: std::boxed::Box::new_in(source, Sensitive),
-			refs: Cell::new(RefCount::default())
+			refs: RefCount::default()
 		};
 
 		outer.protect(Protection::NoAccess).unwrap();
@@ -54,16 +53,13 @@ impl<T> Box<T> {
 	}
 
 	pub fn borrow(&self) -> Ref<'_, T> {
-		if self.refs.update(|refs| refs.acquire()).get() == 1 {
-			self.protect(Protection::ReadOnly).unwrap();
-		}
+		self.refs.acquire(|| self.protect(Protection::ReadOnly).unwrap());
 
 		Ref(self)
 	}
 
 	pub fn borrow_mut(&mut self) -> RefMut<'_, T> {
-		self.refs.update(|refs| refs.acquire_mut());
-		self.protect(Protection::ReadWrite).unwrap();
+		self.refs.acquire_mut(|| self.protect(Protection::ReadWrite).unwrap());
 
 		RefMut(self)
 	}
@@ -99,9 +95,9 @@ impl<T> Deref for Ref<'_, T> {
 
 impl<T> Drop for Ref<'_, T> {
 	fn drop(&mut self) {
-		if self.0.refs.update(|refs| refs.release()).get() == 0 {
-			self.0.protect(Protection::NoAccess).unwrap();
-		}
+		self.0.refs.release(
+			|| self.0.protect(Protection::NoAccess).unwrap(),
+			|| self.0.protect(Protection::ReadOnly).unwrap());
 	}
 }
 
@@ -121,10 +117,7 @@ impl<T> DerefMut for RefMut<'_, T> {
 
 impl<T> Drop for RefMut<'_, T> {
 	fn drop(&mut self) {
-		self.0.protect(match self.0.refs.update(|refs| refs.release_mut()).get() {
-			0 => Protection::NoAccess,
-			_ => Protection::ReadOnly
-		}).unwrap();
+		self.0.refs.release_mut(|| self.0.protect(Protection::NoAccess).unwrap());
 	}
 }
 
