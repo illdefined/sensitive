@@ -89,8 +89,8 @@ pub fn alloc_align(offset: usize) -> usize {
 	align(offset, granularity())
 }
 
-pub unsafe fn zero(addr: *mut u8, size: usize) {
-	std::intrinsics::volatile_set_memory(addr, 0, size);
+pub unsafe fn zero<T>(addr: *mut T, count: usize) {
+	std::intrinsics::volatile_set_memory(addr, 0, count);
 }
 
 #[cfg(unix)]
