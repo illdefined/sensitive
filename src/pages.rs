@@ -69,16 +69,16 @@ pub fn page_size() -> usize {
 	unsafe { PAGE_SIZE.assume_init() }
 }
 
-#[cfg(unix)]
 pub fn granularity() -> usize {
-	page_size()
-}
+	#[cfg(unix)] {
+		page_size()
+	}
 
-#[cfg(windows)]
-pub fn granularity() -> usize {
-	init();
+	#[cfg(windows)] {
+		init();
 
-	unsafe { GRANULARITY.assume_init() }
+		unsafe { GRANULARITY.assume_init() }
+	}
 }
 
 pub fn page_align(offset: usize) -> usize {
@@ -93,167 +93,157 @@ pub unsafe fn zero<T>(addr: *mut T, count: usize) {
 	std::intrinsics::volatile_set_memory(addr, 0, count);
 }
 
-#[cfg(unix)]
+
 pub unsafe fn allocate(size: usize, prot: Protection) -> Result<*mut u8, Error> {
-	use libc::{mmap, MAP_PRIVATE, MAP_ANON, MAP_FAILED};
-	use std::os::raw::c_int;
-
 	debug_assert_eq!(alloc_align(size), size);
 
-	match mmap(ptr::null_mut(), size, prot as c_int, MAP_PRIVATE | MAP_ANON, -1, 0) {
-		MAP_FAILED => Err(Error::last_os_error()),
-		addr => Ok(addr as *mut u8),
+	#[cfg(unix)] {
+		use libc::{mmap, MAP_PRIVATE, MAP_ANON, MAP_FAILED};
+		use std::os::raw::c_int;
+
+		match mmap(ptr::null_mut(), size, prot as c_int, MAP_PRIVATE | MAP_ANON, -1, 0) {
+			MAP_FAILED => Err(Error::last_os_error()),
+			addr => Ok(addr as *mut u8),
+		}
+	}
+
+	#[cfg(windows)] {
+		use winapi::shared::minwindef::DWORD;
+		use winapi::shared::ntdef::NULL;
+		use winapi::um::memoryapi::VirtualAlloc;
+		use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE};
+
+		match VirtualAlloc(ptr::null_mut(), size, MEM_COMMIT | MEM_RESERVE, prot as DWORD) {
+			NULL => Err(Error::last_os_error()),
+			addr => Ok(addr as *mut u8),
+		}
 	}
 }
 
-#[cfg(windows)]
-pub unsafe fn allocate(size: usize, prot: Protection) -> Result<*mut u8, Error> {
-	use winapi::shared::minwindef::DWORD;
-	use winapi::shared::ntdef::NULL;
-	use winapi::um::memoryapi::VirtualAlloc;
-	use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE};
-
-	debug_assert_eq!(alloc_align(size), size);
-
-	match VirtualAlloc(ptr::null_mut(), size, MEM_COMMIT | MEM_RESERVE, prot as DWORD) {
-		NULL => Err(Error::last_os_error()),
-		addr => Ok(addr as *mut u8),
-	}
-}
-
-#[cfg(unix)]
 pub unsafe fn uncommit(addr: *mut u8, size: usize) -> Result<(), Error> {
-	release(addr, size)
-}
-
-#[cfg(windows)]
-pub unsafe fn uncommit(addr: *mut u8, size: usize) -> Result<(), Error> {
-	use winapi::ctypes::c_void;
-	use winapi::um::memoryapi::VirtualFree;
-	use winapi::um::winnt::MEM_DECOMMIT;
-
 	debug_assert_eq!(addr.align_offset(page_size()), 0);
 	debug_assert_eq!(page_align(size), size);
 
-	match VirtualFree(addr as *mut c_void, size, MEM_DECOMMIT) {
-		0 => Err(Error::last_os_error()),
-		_ => Ok(()),
+	#[cfg(unix)] {
+		release(addr, size)
+	}
+
+	#[cfg(windows)] {
+		use winapi::ctypes::c_void;
+		use winapi::um::memoryapi::VirtualFree;
+		use winapi::um::winnt::MEM_DECOMMIT;
+
+		match VirtualFree(addr as *mut c_void, size, MEM_DECOMMIT) {
+			0 => Err(Error::last_os_error()),
+			_ => Ok(()),
+		}
 	}
 }
 
-#[cfg(unix)]
 pub unsafe fn release(addr: *mut u8, size: usize) -> Result<(), Error> {
-	use libc::munmap;
-	use std::ffi::c_void;
-
 	debug_assert_eq!(addr.align_offset(granularity()), 0);
 	debug_assert_eq!(alloc_align(size), size);
 
-	match munmap(addr as *mut c_void, size) {
-		0 => Ok(()),
-		_ => Err(Error::last_os_error()),
+	#[cfg(unix)] {
+		use libc::munmap;
+		use std::ffi::c_void;
+
+		match munmap(addr as *mut c_void, size) {
+			0 => Ok(()),
+			_ => Err(Error::last_os_error()),
+		}
+	}
+
+	#[cfg(windows)] {
+		use winapi::ctypes::c_void;
+		use winapi::um::memoryapi::VirtualFree;
+		use winapi::um::winnt::MEM_RELEASE;
+
+		match VirtualFree(addr as *mut c_void, 0, MEM_RELEASE) {
+			0 => Err(Error::last_os_error()),
+			_ => Ok(()),
+		}
 	}
 }
 
-#[cfg(windows)]
-pub unsafe fn release(addr: *mut u8, size: usize) -> Result<(), Error> {
-	use winapi::ctypes::c_void;
-	use winapi::um::memoryapi::VirtualFree;
-	use winapi::um::winnt::MEM_RELEASE;
-
-	debug_assert_eq!(addr.align_offset(granularity()), 0);
-	debug_assert_eq!(alloc_align(size), size);
-
-	match VirtualFree(addr as *mut c_void, 0, MEM_RELEASE) {
-		0 => Err(Error::last_os_error()),
-		_ => Ok(()),
-	}
-}
-
-#[cfg(unix)]
 pub unsafe fn protect(addr: *mut u8, size: usize, prot: Protection) -> Result<(), Error> {
-	use libc::mprotect;
-	use std::ffi::c_void;
-	use std::os::raw::c_int;
-
 	debug_assert_eq!(addr.align_offset(page_size()), 0);
 	debug_assert_eq!(page_align(size), size);
 
-	match mprotect(addr as *mut c_void, size, prot as c_int) {
-		0 => Ok(()),
-		_ => Err(Error::last_os_error()),
+	#[cfg(unix)] {
+		use libc::mprotect;
+		use std::ffi::c_void;
+		use std::os::raw::c_int;
+
+		match mprotect(addr as *mut c_void, size, prot as c_int) {
+			0 => Ok(()),
+			_ => Err(Error::last_os_error()),
+		}
+	}
+
+	#[cfg(windows)] {
+		use winapi::ctypes::c_void;
+		use winapi::shared::minwindef::DWORD;
+		use winapi::um::memoryapi::VirtualProtect;
+
+		let mut old = MaybeUninit::<DWORD>::uninit();
+		match VirtualProtect(addr as *mut c_void, size, prot as DWORD, old.as_mut_ptr()) {
+			0 => Err(Error::last_os_error()),
+			_ => Ok(()),
+		}
 	}
 }
 
-#[cfg(windows)]
-pub unsafe fn protect(addr: *mut u8, size: usize, prot: Protection) -> Result<(), Error> {
-	use winapi::ctypes::c_void;
-	use winapi::shared::minwindef::DWORD;
-	use winapi::um::memoryapi::VirtualProtect;
-
-	debug_assert_eq!(addr.align_offset(page_size()), 0);
-	debug_assert_eq!(page_align(size), size);
-
-	let mut old = MaybeUninit::<DWORD>::uninit();
-	match VirtualProtect(addr as *mut c_void, size, prot as DWORD, old.as_mut_ptr()) {
-		0 => Err(Error::last_os_error()),
-		_ => Ok(()),
-	}
-}
-
-#[cfg(unix)]
 pub unsafe fn lock(addr: *mut u8, size: usize) -> Result<(), Error> {
-	use libc::mlock;
-	use std::ffi::c_void;
-
 	debug_assert_eq!(addr.align_offset(page_size()), 0);
 	debug_assert_eq!(page_align(size), size);
 
-	match mlock(addr as *mut c_void, size) {
-		0 => Ok(()),
-		_ => Err(Error::last_os_error()),
+	#[cfg(unix)] {
+		use libc::mlock;
+		use std::ffi::c_void;
+
+		match mlock(addr as *mut c_void, size) {
+			0 => Ok(()),
+			_ => Err(Error::last_os_error()),
+		}
+	}
+
+	#[cfg(windows)] {
+		use winapi::ctypes::c_void;
+		use winapi::um::memoryapi::VirtualLock;
+
+		match VirtualLock(addr as *mut c_void, size) {
+			0 => Err(Error::last_os_error()),
+			_ => Ok(()),
+		}
 	}
 }
 
-#[cfg(windows)]
-pub unsafe fn lock(addr: *mut u8, size: usize) -> Result<(), Error> {
-	use winapi::ctypes::c_void;
-	use winapi::um::memoryapi::VirtualLock;
-
-	debug_assert_eq!(addr.align_offset(page_size()), 0);
-	debug_assert_eq!(page_align(size), size);
-
-	match VirtualLock(addr as *mut c_void, size) {
-		0 => Err(Error::last_os_error()),
-		_ => Ok(()),
-	}
-}
-
-#[cfg(unix)]
 pub unsafe fn unlock(addr: *mut u8, size: usize) -> Result<(), Error> {
-	use libc::munlock;
-	use std::ffi::c_void;
-
 	debug_assert_eq!(addr.align_offset(granularity()), 0);
 	debug_assert_eq!(alloc_align(size), size);
 
-	match munlock(addr as *mut c_void, size) {
-		0 => Ok(()),
-		_ => Err(Error::last_os_error()),
+	#[cfg(unix)] {
+		use libc::munlock;
+		use std::ffi::c_void;
+
+		match munlock(addr as *mut c_void, size) {
+			0 => Ok(()),
+			_ => Err(Error::last_os_error()),
+		}
 	}
-}
 
-#[cfg(windows)]
-pub unsafe fn unlock(addr: *mut u8, size: usize) -> Result<(), Error> {
-	use winapi::ctypes::c_void;
-	use winapi::um::memoryapi::VirtualUnlock;
+	#[cfg(windows)] {
+		use winapi::ctypes::c_void;
+		use winapi::um::memoryapi::VirtualUnlock;
 
-	debug_assert_eq!(addr.align_offset(granularity()), 0);
-	debug_assert_eq!(alloc_align(size), size);
+		debug_assert_eq!(addr.align_offset(granularity()), 0);
+		debug_assert_eq!(alloc_align(size), size);
 
-	match VirtualUnlock(addr as *mut c_void, size) {
-		0 => Err(Error::last_os_error()),
-		_ => Ok(()),
+		match VirtualUnlock(addr as *mut c_void, size) {
+			0 => Err(Error::last_os_error()),
+			_ => Ok(()),
+		}
 	}
 }
 
