@@ -1,5 +1,5 @@
+use crate::auxiliary::zero;
 use crate::alloc::Sensitive;
-use crate::pages::zero;
 use crate::guard::{Guard, Ref, RefMut};
 use crate::traits::{Pages, Protectable};
 

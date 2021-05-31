@@ -9,6 +9,7 @@
 	slice_ptr_len,
 )]
 
+pub mod auxiliary;
 pub mod pages;
 pub mod alloc;
 pub mod boxed;

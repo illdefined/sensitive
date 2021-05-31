@@ -1,3 +1,4 @@
+use crate::auxiliary::align;
 use crate::traits::{Pages, Protectable};
 
 use std::convert::TryInto;
@@ -31,16 +32,6 @@ static mut PAGE_SIZE: MaybeUninit<usize> = MaybeUninit::uninit();
 
 #[cfg(windows)]
 static mut GRANULARITY: MaybeUninit<usize> = MaybeUninit::uninit();
-
-pub fn is_power_of_two(num: usize) -> bool {
-	num != 0 && (num & (num - 1)) == 0
-}
-
-pub fn align(offset: usize, align: usize) -> usize {
-	debug_assert!(is_power_of_two(align));
-
-	(offset + (align - 1)) & !(align - 1)
-}
 
 fn init() {
 	#[cfg(unix)]
@@ -90,11 +81,6 @@ pub fn page_align(offset: usize) -> usize {
 pub fn alloc_align(offset: usize) -> usize {
 	align(offset, granularity())
 }
-
-pub unsafe fn zero<T>(addr: *mut T, count: usize) {
-	std::intrinsics::volatile_set_memory(addr, 0, count);
-}
-
 
 pub unsafe fn allocate(size: usize, prot: Protection) -> Result<*mut u8, Error> {
 	debug_assert_eq!(alloc_align(size), size);
@@ -276,6 +262,8 @@ impl<T: Pages> Protectable for T {
 mod tests {
 	use super::*;
 
+	use crate::auxiliary::is_power_of_two;
+
 	#[test]
 	fn test_page_size() {
 		assert!(is_power_of_two(page_size()));
@@ -289,38 +277,6 @@ mod tests {
 		assert!(is_power_of_two(granularity()));
 		assert!(granularity() >= page_size());
 		assert_eq!(align(granularity(), page_size()), granularity());
-	}
-
-	#[test]
-	fn test_is_power_of_two() {
-		let mut p = 2;
-
-		while p < usize::MAX / 2 {
-			assert!(is_power_of_two(p));
-			p *= 2;
-		}
-	}
-
-	#[test]
-	fn test_not_is_power_of_two() {
-		let mut p = 2;
-
-		while p <= 4194304 {
-			for q in p + 1 .. p * 2 {
-				assert!(!is_power_of_two(q));
-			}
-
-			p *= 2;
-		}
-	}
-
-	#[test]
-	fn test_align() {
-		assert_eq!(align(0, 4096), 0);
-
-		for i in 1..4096 {
-			assert_eq!(align(i, 4096), 4096);
-		}
 	}
 
 	#[cfg(unix)]
