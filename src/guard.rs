@@ -1,14 +1,9 @@
+use crate::traits::Protectable;
+
 use std::default::Default;
 use std::fmt;
-use std::io::Error;
 use std::ops::{Deref, DerefMut, Index, IndexMut, Drop};
 use std::sync::atomic::{AtomicUsize, Ordering};
-
-pub trait Protectable {
-	fn lock(&self) -> Result<(), Error>;
-	fn unlock(&self) -> Result<(), Error>;
-	fn unlock_mut(&mut self) -> Result<(), Error>;
-}
 
 pub struct Guard<T: Protectable>(AtomicUsize, T);
 pub struct Ref<'t, T: Protectable>(pub &'t Guard<T>);

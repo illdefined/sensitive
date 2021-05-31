@@ -1,6 +1,7 @@
 use crate::alloc::Sensitive;
 use crate::pages::{Protection, page_align, protect, zero};
-use crate::guard::{Guard, Protectable};
+use crate::guard::Guard;
+use crate::traits::Protectable;
 
 use std::io::Error;
 

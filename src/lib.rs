@@ -12,4 +12,5 @@ pub mod alloc;
 pub mod boxed;
 pub mod vec;
 
+mod traits;
 mod guard;
