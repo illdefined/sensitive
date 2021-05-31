@@ -50,13 +50,15 @@ unsafe impl Allocator for Sensitive {
 
 		let full = alloc_align(layout.size() + 2 * Self::guard_size());
 
-		// Allow read‐write access before zeroing
-		if protect(ptr.as_ptr(), page_align(layout.size()), Protection::ReadWrite).is_err() {
-			handle_alloc_error(layout);
-		}
+		if layout.size() > 0 {
+			// Allow read‐write access before zeroing
+			if protect(ptr.as_ptr(), page_align(layout.size()), Protection::ReadWrite).is_err() {
+				handle_alloc_error(layout);
+			}
 
-		// Zero memory before returning to OS
-		zero(ptr.as_ptr(), layout.size());
+			// Zero memory before returning to OS
+			zero(ptr.as_ptr(), layout.size());
+		}
 
 		let addr = ptr.as_ptr().sub(Self::guard_size());
 
