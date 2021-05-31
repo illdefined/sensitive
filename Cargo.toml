@@ -1,6 +1,6 @@
 [package]
 name = "sensitive"
-version = "0.5.0"
+version = "0.6.0"
 authors = [ "Mikael Voss <mvs@nyantec.com>" ]
 edition = "2018"
 description = "Memory allocator for sensitive information"
@@ -16,6 +16,7 @@ libc = "0.2"
 winapi = { version = "0.3", features = [ "memoryapi", "sysinfoapi", "winnt" ] }
 
 [dev-dependencies]
+num_cpus = "1.13"
 rand = "0.8"
 
 [target.'cfg(unix)'.dev-dependencies]
