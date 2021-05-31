@@ -1,25 +1,47 @@
 use crate::alloc::Sensitive;
 use crate::pages::{Protection, page_align, protect, zero};
-use crate::refs::RefCount;
+use crate::guard::{Protectable, Guard, Ref, RefMut};
 
 use std::cmp::PartialEq;
-use std::default::Default;
-use std::fmt;
-use std::ops::{Deref, DerefMut, Drop};
+use std::io::Error;
 
-pub struct Vec<T> {
-	vec: std::vec::Vec<T, Sensitive>,
-	refs: RefCount
+type InnerVec<T> = std::vec::Vec<T, Sensitive>;
+pub type Vec<T> = Guard<InnerVec<T>>;
+
+unsafe fn vec_raw_ptr<T>(vec: &InnerVec<T>) -> *mut u8 {
+	debug_assert!(vec.capacity() > 0);
+
+	vec.as_ptr().cast::<u8>() as *mut u8
 }
 
-#[derive(Debug)]
-pub struct Ref<'t, T>(&'t Vec<T>);
+fn vec_protect<T>(vec: &InnerVec<T>, prot: Protection) -> Result<(), Error> {
+	if vec.capacity() > 0 {
+		unsafe { protect(vec_raw_ptr(vec), page_align(vec.capacity()), prot) }
+	} else {
+		Ok(())
+	}
+}
 
-#[derive(Debug)]
-pub struct RefMut<'t, T>(&'t mut Vec<T>);
+impl<T> Protectable for InnerVec<T> {
+	fn lock(&self) -> Result<(), Error> {
+		vec_protect(self, Protection::NoAccess)
+	}
+
+	fn unlock(&self) -> Result<(), Error> {
+		vec_protect(self, Protection::ReadOnly)
+	}
+
+	fn unlock_mut(&mut self) -> Result<(), Error> {
+		vec_protect(self, Protection::ReadWrite)
+	}
+}
 
 impl<T> Vec<T> {
 	const CMP_MIN: usize = 32;
+
+	pub unsafe fn raw_ptr(&self) -> *mut u8 {
+		vec_raw_ptr(self.inner())
+	}
 
 	fn eq_slice<U>(a: &Vec<T>, b: &[U]) -> bool
 		where T: PartialEq<U> {
@@ -35,112 +57,74 @@ impl<T> Vec<T> {
 		}
 	}
 
-	unsafe fn raw_ptr(&self) -> *mut u8 {
-		debug_assert!(self.capacity() > 0);
-
-		self.vec.as_ptr().cast::<u8>() as *mut u8
-	}
-
-	fn protect(&self, prot: Protection) -> Result<(), std::io::Error> {
-		if self.capacity() > 0 {
-			unsafe { protect(self.raw_ptr(), page_align(self.capacity()), prot) }
-		} else {
-			Ok(())
-		}
-	}
-
 	pub fn new() -> Self {
-		let outer = Self {
-			vec: std::vec::Vec::new_in(Sensitive),
-			refs: RefCount::default()
-		};
-
-		debug_assert!(outer.capacity() == 0);
-
-		outer
+		let guard = Guard::from_inner(std::vec::Vec::new_in(Sensitive));
+		debug_assert!(guard.capacity() == 0);
+		guard
 	}
 
 	fn with_capacity_unprotected(capacity: usize) -> Self {
-		Self {
-			vec: std::vec::Vec::with_capacity_in(capacity, Sensitive),
-			refs: RefCount::default()
-		}
+		Guard::from_inner(std::vec::Vec::with_capacity_in(capacity, Sensitive))
 	}
 
 	pub fn with_capacity(capacity: usize) -> Self {
-		let outer = Self::with_capacity_unprotected(capacity);
-
-		outer.protect(Protection::NoAccess).unwrap();
-		outer
-	}
-
-	pub fn borrow(&self) -> Ref<'_, T> {
-		self.refs.acquire(|| self.protect(Protection::ReadOnly).unwrap());
-
-		Ref(self)
-	}
-
-	pub fn borrow_mut(&mut self) -> RefMut<'_, T> {
-		self.refs.acquire_mut(|| self.protect(Protection::ReadWrite).unwrap());
-
-		RefMut(self)
+		let mut guard = Self::with_capacity_unprotected(capacity);
+		guard.mutate(|vec| vec.lock().unwrap());
+		guard
 	}
 
 	pub fn capacity(&self) -> usize {
-		self.vec.capacity()
+		unsafe { self.inner().capacity() }
 	}
 
 	pub fn reserve(&mut self, capacity: usize) {
-		self.vec.reserve(capacity);
-		self.refs.mutate(|| self.protect(Protection::NoAccess).unwrap());
+		self.mutate(|vec| {
+			vec.reserve(capacity);
+			vec.lock().unwrap();
+		});
 	}
 
 	pub fn reserve_exact(&mut self, capacity: usize) {
-		self.vec.reserve_exact(capacity);
-		self.refs.mutate(|| self.protect(Protection::NoAccess).unwrap());
+		self.mutate(|vec| {
+			vec.reserve_exact(capacity);
+			vec.lock().unwrap();
+		});
 	}
 
 	pub fn len(&self) -> usize {
-		self.vec.len()
+		unsafe { self.inner().len() }
 	}
 
 	pub fn is_empty(&self) -> bool {
-		self.vec.is_empty()
+		unsafe { self.inner().is_empty() }
 	}
 
 	pub unsafe fn set_len(&mut self, len: usize) {
-		self.vec.set_len(len)
+		self.mutate(|vec| vec.set_len(len));
 	}
 
 	pub fn as_ptr(&self) -> *const T {
-		self.vec.as_ptr()
+		unsafe { self.inner().as_ptr() }
 	}
 
 	pub fn as_mut_ptr(&mut self) -> *mut T {
-		self.vec.as_mut_ptr()
-	}
-}
-
-impl<T> Default for Vec<T> {
-	fn default() -> Self {
-		Self::new()
+		unsafe { self.inner_mut().as_mut_ptr() }
 	}
 }
 
 impl<T> From<&mut [T]> for Vec<T> {
 	fn from(source: &mut [T]) -> Self {
 		let len = source.len();
-		let mut outer = Self::with_capacity_unprotected(len);
+		let mut guard = Self::with_capacity_unprotected(len);
 
 		unsafe {
-			outer.as_mut_ptr().copy_from_nonoverlapping(source.as_ptr(), len);
-			outer.set_len(len);
+			guard.as_mut_ptr().copy_from_nonoverlapping(source.as_ptr(), len);
+			guard.set_len(len);
 			zero(source.as_mut_ptr(), len);
+			guard.inner().lock().unwrap();
 		}
 
-		outer.protect(Protection::NoAccess).unwrap();
-
-		outer
+		guard
 	}
 }
 
@@ -189,36 +173,14 @@ impl PartialEq<&str> for Vec<u8> {
 	}
 }
 
-impl<T> fmt::Debug for Vec<T> {
-	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-		fmt.debug_struct("Vec")
-			.field("refs", &self.refs)
-			.finish_non_exhaustive()
-	}
-}
-
-impl<T> Drop for Vec<T> {
-	fn drop(&mut self) {
-		self.protect(Protection::ReadWrite).unwrap();
-	}
-}
-
-impl<T> Deref for Ref<'_, T> {
-	type Target = [T];
-
-	fn deref(&self) -> &Self::Target {
-		self.0.vec.as_slice()
-	}
-}
-
-impl<T, U> PartialEq<[U]> for Ref<'_, T>
+impl<T, U> PartialEq<[U]> for Ref<'_, InnerVec<T>>
 	where T: PartialEq<U> {
 	fn eq(&self, other: &[U]) -> bool {
 		Vec::<T>::eq_slice(self.0, other)
 	}
 }
 
-impl<T, U> PartialEq<&[U]> for Ref<'_, T>
+impl<T, U> PartialEq<&[U]> for Ref<'_, InnerVec<T>>
 	where T: PartialEq<U> {
 	fn eq(&self, other: &&[U]) -> bool {
 		self == *other
@@ -226,86 +188,57 @@ impl<T, U> PartialEq<&[U]> for Ref<'_, T>
 }
 
 
-impl<T, U, const N: usize> PartialEq<[U; N]> for Ref<'_, T>
+impl<T, U, const N: usize> PartialEq<[U; N]> for Ref<'_, InnerVec<T>>
 	where T: PartialEq<U> {
 	fn eq(&self, other: &[U; N]) -> bool {
 		self == other as &[U]
 	}
 }
 
-impl PartialEq<&str> for Ref<'_, u8> {
+impl PartialEq<&str> for Ref<'_, InnerVec<u8>> {
 	fn eq(&self, other: &&str) -> bool {
 		self == other.as_bytes()
 	}
 }
 
-impl<T> Drop for Ref<'_, T> {
-	fn drop(&mut self) {
-		self.0.refs.release(
-			|| self.0.protect(Protection::NoAccess).unwrap(),
-			|| self.0.protect(Protection::ReadOnly).unwrap());
-	}
-}
-
-impl<T> RefMut<'_, T> {
+impl<T> RefMut<'_, InnerVec<T>> {
 	pub fn push(&mut self, value: T) {
-		self.0.vec.push(value);
+		self.inner_mut().push(value);
 	}
 
 	pub fn pop(&mut self) -> Option<T> {
-		self.0.vec.pop()
+		self.inner_mut().pop()
 	}
 
 	pub fn shrink_to_fit(&mut self) {
-		self.0.vec.shrink_to_fit();
+		self.inner_mut().shrink_to_fit();
 	}
 }
 
-impl<T> Deref for RefMut<'_, T> {
-	type Target = [T];
-
-	fn deref(&self) -> &Self::Target {
-		self.0.vec.as_slice()
-	}
-}
-
-impl<T> DerefMut for RefMut<'_, T> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		self.0.vec.as_mut_slice()
-	}
-}
-
-impl<T, U> PartialEq<[U]> for RefMut<'_, T>
+impl<T, U> PartialEq<[U]> for RefMut<'_, InnerVec<T>>
 	where T: PartialEq<U> {
 	fn eq(&self, other: &[U]) -> bool {
 		Vec::<T>::eq_slice(self.0, other)
 	}
 }
 
-impl<T, U> PartialEq<&[U]> for RefMut<'_, T>
+impl<T, U> PartialEq<&[U]> for RefMut<'_, InnerVec<T>>
 	where T: PartialEq<U> {
 	fn eq(&self, other: &&[U]) -> bool {
 		self == *other
 	}
 }
 
-
-impl<T, U, const N: usize> PartialEq<[U; N]> for RefMut<'_, T>
+impl<T, U, const N: usize> PartialEq<[U; N]> for RefMut<'_, InnerVec<T>>
 	where T: PartialEq<U> {
 	fn eq(&self, other: &[U; N]) -> bool {
 		self == other as &[U]
 	}
 }
 
-impl PartialEq<&str> for RefMut<'_, u8> {
+impl PartialEq<&str> for RefMut<'_, InnerVec<u8>> {
 	fn eq(&self, other: &&str) -> bool {
 		self == other.as_bytes()
-	}
-}
-
-impl<T> Drop for RefMut<'_, T> {
-	fn drop(&mut self) {
-		self.0.refs.release_mut(|| self.0.protect(Protection::NoAccess).unwrap());
 	}
 }
 

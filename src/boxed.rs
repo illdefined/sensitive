@@ -1,123 +1,59 @@
 use crate::alloc::Sensitive;
 use crate::pages::{Protection, page_align, protect, zero};
-use crate::refs::RefCount;
+use crate::guard::{Guard, Protectable};
 
-use std::default::Default;
-use std::fmt;
-use std::ops::{Deref, DerefMut, Drop};
+use std::io::Error;
 
-pub struct Box<T> {
-	boxed: std::boxed::Box<T, Sensitive>,
-	refs: RefCount
+type InnerBox<T> = std::boxed::Box<T, Sensitive>;
+type Box<T> = Guard<InnerBox<T>>;
+
+unsafe fn box_raw_ptr<T>(boxed: &InnerBox<T>) -> *mut u8 {
+	debug_assert!(std::mem::size_of::<T>() > 0);
+
+	(&**boxed as *const T).cast::<u8>() as *mut u8
 }
 
-#[derive(Debug)]
-pub struct Ref<'t, T>(&'t Box<T>);
+fn box_protect<T>(boxed: &InnerBox<T>, prot: Protection) -> Result<(), std::io::Error> {
+	if std::mem::size_of::<T>() > 0 {
+		unsafe { protect(box_raw_ptr(boxed), page_align(std::mem::size_of::<T>()), prot) }
+	} else {
+		Ok(())
+	}
+}
 
-#[derive(Debug)]
-pub struct RefMut<'t, T>(&'t mut Box<T>);
-
-impl<T> Box<T> {
-	unsafe fn raw_ptr(&self) -> *mut u8 {
-		debug_assert!(std::mem::size_of::<T>() > 0);
-
-		(&*self.boxed as *const T).cast::<u8>() as *mut u8
+impl<T> Protectable for InnerBox<T> {
+	fn lock(&self) -> Result<(), Error> {
+		box_protect(self, Protection::NoAccess)
 	}
 
-	fn protect(&self, prot: Protection) -> Result<(), std::io::Error> {
-		if std::mem::size_of::<T>() > 0 {
-			unsafe { protect(self.raw_ptr(), page_align(std::mem::size_of::<T>()), prot) }
-		} else {
-			Ok(())
-		}
+	fn unlock(&self) -> Result<(), Error> {
+		box_protect(self, Protection::ReadOnly)
+	}
+
+	fn unlock_mut(&mut self) -> Result<(), Error> {
+		box_protect(self, Protection::ReadWrite)
+	}
+}
+
+impl<T> Box<T> {
+	pub unsafe fn raw_ptr(&self) -> *mut u8 {
+		box_raw_ptr(self.inner())
 	}
 
 	fn new_without_clear(source: T) -> Self {
-		let outer = Self {
-			boxed: std::boxed::Box::new_in(source, Sensitive),
-			refs: RefCount::default()
-		};
-
-		outer.protect(Protection::NoAccess).unwrap();
-		outer
+		let mut guard = Guard::from_inner(std::boxed::Box::new_in(source, Sensitive));
+		guard.mutate(|boxed| boxed.lock().unwrap());
+		guard
 	}
 
 	pub fn new(mut source: T) -> Self {
 		let ptr: *mut T = &mut source;
-		let outer = Self::new_without_clear(source);
+		let guard = Self::new_without_clear(source);
 
 		// Clear out source
 		unsafe { zero(ptr, 1); }
 
-		outer
-	}
-
-	pub fn borrow(&self) -> Ref<'_, T> {
-		self.refs.acquire(|| self.protect(Protection::ReadOnly).unwrap());
-
-		Ref(self)
-	}
-
-	pub fn borrow_mut(&mut self) -> RefMut<'_, T> {
-		self.refs.acquire_mut(|| self.protect(Protection::ReadWrite).unwrap());
-
-		RefMut(self)
-	}
-}
-
-impl<T: Default> Default for Box<T> {
-	fn default() -> Self {
-		Self::new_without_clear(T::default())
-	}
-}
-
-impl<T> fmt::Debug for Box<T> {
-	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-		fmt.debug_struct("Box")
-			.field("refs", &self.refs)
-			.finish_non_exhaustive()
-	}
-}
-
-impl<T> Drop for Box<T> {
-	fn drop(&mut self) {
-		self.protect(Protection::ReadWrite).unwrap();
-	}
-}
-
-impl<T> Deref for Ref<'_, T> {
-	type Target = T;
-
-	fn deref(&self) -> &Self::Target {
-		self.0.boxed.as_ref()
-	}
-}
-
-impl<T> Drop for Ref<'_, T> {
-	fn drop(&mut self) {
-		self.0.refs.release(
-			|| self.0.protect(Protection::NoAccess).unwrap(),
-			|| self.0.protect(Protection::ReadOnly).unwrap());
-	}
-}
-
-impl<T> Deref for RefMut<'_, T> {
-	type Target = T;
-
-	fn deref(&self) -> &Self::Target {
-		self.0.boxed.as_ref()
-	}
-}
-
-impl<T> DerefMut for RefMut<'_, T> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		self.0.boxed.as_mut()
-	}
-}
-
-impl<T> Drop for RefMut<'_, T> {
-	fn drop(&mut self) {
-		self.0.refs.release_mut(|| self.0.protect(Protection::NoAccess).unwrap());
+		guard
 	}
 }
 
