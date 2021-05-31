@@ -1,17 +1,30 @@
-use std::ops::{Fn, FnOnce};
+use std::default::Default;
+use std::fmt;
+use std::io::Error;
+use std::ops::{Deref, DerefMut, Drop};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[derive(Default, Debug)]
-pub struct RefCount(AtomicUsize);
+pub trait Protectable {
+	fn lock(&self) -> Result<(), Error>;
+	fn unlock(&self) -> Result<(), Error>;
+	fn unlock_mut(&mut self) -> Result<(), Error>;
+}
 
-impl RefCount {
+pub struct Guard<T: Protectable>(AtomicUsize, T);
+pub struct Ref<'t, T: Protectable>(pub &'t Guard<T>);
+pub struct RefMut<'t, T: Protectable>(pub &'t mut Guard<T>);
+
+impl<T: Protectable> Guard<T> {
 	const ACC: usize = usize::MAX / 2 + 1;
 	const REF: usize = !Self::ACC;
 	const MUT: usize = usize::MAX & Self::REF;
 	const MAX: usize = (usize::MAX & Self::REF) - 1;
 
-	pub fn acquire<A>(&self, acquire: A)
-		where A: FnOnce() {
+	pub fn from_inner(inner: T) -> Self {
+		Self(AtomicUsize::default(), inner)
+	}
+
+	fn acquire(&self) -> &Self {
 		// Increment ref counter
 		let mut refs = self.0.fetch_add(1, Ordering::AcqRel);
 
@@ -20,7 +33,7 @@ impl RefCount {
 
 		if refs == 0 {
 			// First acquisition
-			acquire();
+			self.1.unlock().unwrap();
 
 			// Mark accessible
 			self.0.fetch_or(Self::ACC, Ordering::Release);
@@ -30,10 +43,11 @@ impl RefCount {
 				refs = self.0.load(Ordering::Acquire);
 			}
 		}
+
+		self
 	}
 
-	pub fn release<R, A>(&self, release: R, acquire: A)
-		where R: Fn(), A: Fn() {
+	fn release(&self) -> &Self {
 		// Last release?
 		if self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire,
 		|refs| if refs & Self::REF == 1 {
@@ -52,7 +66,7 @@ impl RefCount {
 		self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire,
 		|refs| if refs == 1 {
 				// Last release
-				release();
+				self.1.lock().unwrap();
 
 				Some(0)
 			} else {
@@ -60,29 +74,135 @@ impl RefCount {
 				debug_assert_eq!(refs & Self::ACC, 0);
 
 				// Reacquisition
-				acquire();
+				self.1.unlock().unwrap();
 
 				Some((refs - 1) | Self::ACC)
 			}).unwrap();
 		}
+
+		self
 	}
 
-	pub fn acquire_mut<A>(&self, acquire: A)
-		where A: FnOnce() {
+	fn acquire_mut(&mut self) -> &mut Self {
 		debug_assert_eq!(self.0.swap(Self::ACC | Self::MUT, Ordering::AcqRel), 0);
-		acquire();
+		self.1.unlock_mut().unwrap();
+		self
 	}
 
-	pub fn release_mut<A>(&self, release: A)
-		where A: FnOnce() {
+	fn release_mut(&mut self) -> &Self {
 		debug_assert_eq!(self.0.swap(0, Ordering::AcqRel), Self::ACC | Self::MUT);
-		release();
+		self.1.lock().unwrap();
+		self
 	}
 
-	pub fn mutate<M>(&self, mutate: M)
-		where M: FnOnce() {
+	pub unsafe fn inner(&self) -> &T {
+		&self.1
+	}
+
+	pub unsafe fn inner_mut(&mut self) -> &mut T {
+		&mut self.1
+	}
+
+	pub fn mutate<M, R>(&mut self, mut mutation: M) -> &Self
+		where M: FnMut(&mut T) -> R {
 		debug_assert_eq!(self.0.swap(Self::ACC | Self::MUT, Ordering::AcqRel), 0);
-		mutate();
+		mutation(&mut self.1);
 		debug_assert_eq!(self.0.swap(0, Ordering::AcqRel), Self::ACC | Self::MUT);
+		self
+	}
+
+	pub fn borrow(&self) -> Ref<'_, T> {
+		Ref(self.acquire())
+	}
+
+	pub fn borrow_mut(&mut self) -> RefMut<'_, T> {
+		RefMut(self.acquire_mut())
+	}
+}
+
+impl<T: Protectable + Default> Default for Guard<T> {
+	fn default() -> Self {
+		Self(AtomicUsize::default(), T::default())
+	}
+}
+
+impl<T: Protectable> fmt::Debug for Guard<T> {
+	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let refs = self.0.load(Ordering::Acquire);
+
+		write!(fmt, "Guard(")?;
+		if refs & Self::ACC != 0 {
+			write!(fmt, "ACC ")?;
+		}
+
+		if refs & Self::REF == Self::MUT {
+			write!(fmt, "MUT")?;
+		} else {
+			write!(fmt, "{}", refs & Self::REF)?;
+		}
+
+		write!(fmt, ", {})", std::any::type_name::<T>())
+	}
+}
+
+impl<T: Protectable> Ref<'_, T> {
+	pub fn inner(&self) -> &T {
+		&self.0.1
+	}
+}
+
+impl<T: Protectable + Deref> Deref for Ref<'_, T> {
+	type Target = T::Target;
+
+	fn deref(&self) -> &Self::Target {
+		&*self.0.1
+	}
+}
+
+impl<T: Protectable> Drop for Ref<'_, T> {
+	fn drop(&mut self) {
+		self.0.release();
+	}
+}
+
+impl<T: Protectable + fmt::Debug> fmt::Debug for Ref<'_, T> {
+	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+		fmt.debug_tuple("Ref").field(&self.0).finish()
+	}
+}
+
+impl<T: Protectable> RefMut<'_, T> {
+	pub fn inner(&self) -> &T {
+		&self.0.1
+	}
+
+	pub fn inner_mut(&mut self) -> &mut T {
+		&mut self.0.1
+	}
+}
+
+impl<T: Protectable + Deref> Deref for RefMut<'_, T> {
+	type Target = T::Target;
+
+	fn deref(&self) -> &Self::Target {
+		&*self.0.1
+	}
+}
+
+impl<T: Protectable + Deref + DerefMut> DerefMut for RefMut<'_, T> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut *self.0.1
+	}
+}
+
+impl<T: Protectable> Drop for RefMut<'_, T> {
+	fn drop(&mut self) {
+		self.0.release_mut();
+	}
+}
+
+impl<T: Protectable + fmt::Debug> fmt::Debug for RefMut<'_, T> {
+	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+		fmt.debug_tuple("RefMut").field(&self.0).finish()
 	}
 }
