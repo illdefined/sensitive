@@ -1,3 +1,5 @@
+use crate::traits::{Pages, Protectable};
+
 use std::convert::TryInto;
 use std::io::Error;
 use std::mem::MaybeUninit;
@@ -244,6 +246,29 @@ pub unsafe fn unlock(addr: *mut u8, size: usize) -> Result<(), Error> {
 			0 => Err(Error::last_os_error()),
 			_ => Ok(()),
 		}
+	}
+}
+
+impl<T: Pages> Protectable for T {
+	fn lock(&self) -> Result<(), Error> {
+		Ok(match self.pages() {
+			Some(pages) => unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::NoAccess)? },
+			None => ()
+		})
+	}
+
+	fn unlock(&self) -> Result<(), Error> {
+		Ok(match self.pages() {
+			Some(pages) => unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::ReadOnly)? },
+			None => ()
+		})
+	}
+
+	fn unlock_mut(&mut self) -> Result<(), Error> {
+		Ok(match self.pages() {
+			Some(pages) => unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::ReadWrite)? },
+			None => ()
+		})
 	}
 }
 

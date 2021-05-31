@@ -1,46 +1,26 @@
 use crate::alloc::Sensitive;
-use crate::pages::{Protection, page_align, protect, zero};
+use crate::pages::zero;
 use crate::guard::Guard;
-use crate::traits::Protectable;
+use crate::traits::{Pages, Protectable};
 
-use std::io::Error;
+use std::ptr::NonNull;
 
 type InnerBox<T> = std::boxed::Box<T, Sensitive>;
 type Box<T> = Guard<InnerBox<T>>;
 
-unsafe fn box_raw_ptr<T>(boxed: &InnerBox<T>) -> *mut u8 {
-	debug_assert!(std::mem::size_of::<T>() > 0);
-
-	(&**boxed as *const T).cast::<u8>() as *mut u8
-}
-
-fn box_protect<T>(boxed: &InnerBox<T>, prot: Protection) -> Result<(), std::io::Error> {
-	if std::mem::size_of::<T>() > 0 {
-		unsafe { protect(box_raw_ptr(boxed), page_align(std::mem::size_of::<T>()), prot) }
-	} else {
-		Ok(())
-	}
-}
-
-impl<T> Protectable for InnerBox<T> {
-	fn lock(&self) -> Result<(), Error> {
-		box_protect(self, Protection::NoAccess)
-	}
-
-	fn unlock(&self) -> Result<(), Error> {
-		box_protect(self, Protection::ReadOnly)
-	}
-
-	fn unlock_mut(&mut self) -> Result<(), Error> {
-		box_protect(self, Protection::ReadWrite)
+impl<T> Pages for InnerBox<T> {
+	fn pages(&self) -> Option<NonNull<[u8]>> {
+		if std::mem::size_of::<T>() > 0 {
+			Some(NonNull::slice_from_raw_parts(
+				NonNull::new((&**self as *const T).cast::<u8>() as *mut u8).unwrap(),
+				Sensitive::inner_size(std::mem::size_of::<T>())))
+		} else {
+			None
+		}
 	}
 }
 
 impl<T> Box<T> {
-	pub unsafe fn raw_ptr(&self) -> *mut u8 {
-		box_raw_ptr(self.inner())
-	}
-
 	fn new_without_clear(source: T) -> Self {
 		let mut guard = Guard::from_inner(std::boxed::Box::new_in(source, Sensitive));
 		guard.mutate(|boxed| boxed.lock().unwrap());
@@ -70,7 +50,7 @@ mod tests {
 		let mut test = Box::<u32>::new(0x55555555);
 		let bp = unsafe { Bulletproof::new() };
 
-		let ptr = unsafe { test.raw_ptr() };
+		let ptr = unsafe { &mut **test.inner_mut() } as *mut u32;
 
 		assert_eq!(unsafe { bp.load(ptr) }, Err(()));
 

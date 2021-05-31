@@ -1,48 +1,28 @@
 use crate::alloc::Sensitive;
-use crate::pages::{Protection, page_align, protect, zero};
+use crate::pages::zero;
 use crate::guard::{Guard, Ref, RefMut};
-use crate::traits::Protectable;
+use crate::traits::{Pages, Protectable};
 
 use std::cmp::PartialEq;
-use std::io::Error;
+use std::ptr::NonNull;
 
 type InnerVec<T> = std::vec::Vec<T, Sensitive>;
 pub type Vec<T> = Guard<InnerVec<T>>;
 
-unsafe fn vec_raw_ptr<T>(vec: &InnerVec<T>) -> *mut u8 {
-	debug_assert!(vec.capacity() > 0);
-
-	vec.as_ptr().cast::<u8>() as *mut u8
-}
-
-fn vec_protect<T>(vec: &InnerVec<T>, prot: Protection) -> Result<(), Error> {
-	if vec.capacity() > 0 {
-		unsafe { protect(vec_raw_ptr(vec), page_align(vec.capacity()), prot) }
-	} else {
-		Ok(())
-	}
-}
-
-impl<T> Protectable for InnerVec<T> {
-	fn lock(&self) -> Result<(), Error> {
-		vec_protect(self, Protection::NoAccess)
-	}
-
-	fn unlock(&self) -> Result<(), Error> {
-		vec_protect(self, Protection::ReadOnly)
-	}
-
-	fn unlock_mut(&mut self) -> Result<(), Error> {
-		vec_protect(self, Protection::ReadWrite)
+impl<T> Pages for InnerVec<T> {
+	fn pages(&self) -> Option<NonNull<[u8]>> {
+		if self.capacity() > 0 {
+			Some(NonNull::slice_from_raw_parts(
+				NonNull::new(self.as_ptr().cast::<u8>() as *mut u8).unwrap(),
+				Sensitive::inner_size(self.capacity() * std::mem::size_of::<T>())))
+		} else {
+			None
+		}
 	}
 }
 
 impl<T> Vec<T> {
 	const CMP_MIN: usize = 32;
-
-	pub unsafe fn raw_ptr(&self) -> *mut u8 {
-		vec_raw_ptr(self.inner())
-	}
 
 	fn eq_slice<U>(a: &Vec<T>, b: &[U]) -> bool
 		where T: PartialEq<U> {
@@ -256,7 +236,7 @@ mod tests {
 		test.borrow_mut().push(0xff);
 
 		let bp = unsafe { Bulletproof::new() };
-		let ptr = unsafe { test.raw_ptr() };
+		let ptr = test.as_mut_ptr();
 
 		assert_eq!(unsafe { bp.load(ptr) }, Err(()));
 

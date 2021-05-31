@@ -11,6 +11,14 @@ impl Sensitive {
 	pub fn guard_size() -> usize {
 		Self::GUARD_PAGES * page_size()
 	}
+
+	pub fn outer_size(size: usize) -> usize {
+		alloc_align(size + 2 * Self::guard_size())
+	}
+
+	pub fn inner_size(size: usize) -> usize {
+		Self::outer_size(size) - 2 * Self::guard_size()
+	}
 }
 
 unsafe impl Allocator for Sensitive {
@@ -21,24 +29,24 @@ unsafe impl Allocator for Sensitive {
 		}
 
 		// Allocate size + two guard pages
-		let full = alloc_align(layout.size() + 2 * Self::guard_size());
-		let size = full - 2 * Self::guard_size();
+		let outer = Self::outer_size(layout.size());
+		let inner = Self::inner_size(layout.size());
 
-		let addr = unsafe { allocate(full, Protection::NoAccess).or(Err(AllocError))? };
+		let addr = unsafe { allocate(outer, Protection::NoAccess).or(Err(AllocError))? };
 		let base = unsafe { addr.add(Self::guard_size()) };
 
-		if size > 0 {
+		if inner > 0 {
 			// Attempt to lock memory
-			let _ = unsafe { lock(base, size) };
+			let _ = unsafe { lock(base, inner) };
 
 			// Allow read‐write access
-			if unsafe { protect(base, size, Protection::ReadWrite).is_err() } {
-				let _ = unsafe { release(addr, full) };
+			if unsafe { protect(base, inner, Protection::ReadWrite).is_err() } {
+				let _ = unsafe { release(addr, outer) };
 				return Err(AllocError);
 			}
 		}
 
-		Ok(NonNull::slice_from_raw_parts(unsafe { NonNull::new_unchecked(base) }, size))
+		Ok(NonNull::slice_from_raw_parts(unsafe { NonNull::new_unchecked(base) }, inner))
 	}
 
 	fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
@@ -48,7 +56,7 @@ unsafe impl Allocator for Sensitive {
 	unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
 		debug_assert!(layout.align() <= page_size());
 
-		let full = alloc_align(layout.size() + 2 * Self::guard_size());
+		let outer = Self::outer_size(layout.size());
 
 		if layout.size() > 0 {
 			// Allow read‐write access before zeroing
@@ -62,7 +70,7 @@ unsafe impl Allocator for Sensitive {
 
 		let addr = ptr.as_ptr().sub(Self::guard_size());
 
-		if release(addr, full).is_err() {
+		if release(addr, outer).is_err() {
 			handle_alloc_error(layout);
 		}
 	}
@@ -76,12 +84,12 @@ unsafe impl Allocator for Sensitive {
 		debug_assert!(new.size() < old.size());
 
 		// Uncommit pages as needed
-		let size_old = page_align(old.size());
-		let size_new = page_align(new.size());
+		let inner_old = page_align(old.size());
+		let inner_new = page_align(new.size());
 
-		if size_old - size_new >= page_size() {
-			let tail = ptr.as_ptr().add(size_new);
-			let diff = size_old - size_new;
+		if inner_old - inner_new >= page_size() {
+			let tail = ptr.as_ptr().add(inner_new);
+			let diff = inner_old - inner_new;
 
 			// Allow read‐write access before zeroing
 			if protect(tail, diff + Self::guard_size(), Protection::ReadWrite).is_err() {
@@ -98,7 +106,7 @@ unsafe impl Allocator for Sensitive {
 			}
 		}
 
-		Ok(NonNull::slice_from_raw_parts(ptr, size_new))
+		Ok(NonNull::slice_from_raw_parts(ptr, inner_new))
 	}
 }
 
