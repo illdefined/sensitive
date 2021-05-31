@@ -1,7 +1,7 @@
 use std::default::Default;
 use std::fmt;
 use std::io::Error;
-use std::ops::{Deref, DerefMut, Drop};
+use std::ops::{Deref, DerefMut, Index, IndexMut, Drop};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub trait Protectable {
@@ -159,6 +159,14 @@ impl<T: Protectable + Deref> Deref for Ref<'_, T> {
 	}
 }
 
+impl<T: Protectable + Index<I>, I> Index<I> for Ref<'_, T> {
+	type Output = T::Output;
+
+	fn index(&self, index: I) -> &Self::Output {
+		&self.0.1[index]
+	}
+}
+
 impl<T: Protectable> Drop for Ref<'_, T> {
 	fn drop(&mut self) {
 		self.0.release();
@@ -186,6 +194,20 @@ impl<T: Protectable + Deref> Deref for RefMut<'_, T> {
 
 	fn deref(&self) -> &Self::Target {
 		&*self.0.1
+	}
+}
+
+impl<T: Protectable + Index<I>, I> Index<I> for RefMut<'_, T> {
+	type Output = T::Output;
+
+	fn index(&self, index: I) -> &Self::Output {
+		&self.0.1[index]
+	}
+}
+
+impl<T: Protectable + Index<I> + IndexMut<I>, I> IndexMut<I> for RefMut<'_, T> {
+	fn index_mut(&mut self, index: I) -> &mut Self::Output {
+		&mut self.0.1[index]
 	}
 }
 
