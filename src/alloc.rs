@@ -50,6 +50,11 @@ unsafe impl Allocator for Sensitive {
 
 		let full = alloc_align(layout.size() + 2 * Self::guard_size());
 
+		// Allow read‐write access before zeroing
+		if protect(ptr.as_ptr(), page_align(layout.size()), Protection::ReadWrite).is_err() {
+			handle_alloc_error(layout);
+		}
+
 		// Zero memory before returning to OS
 		zero(ptr.as_ptr(), layout.size());
 
@@ -68,9 +73,6 @@ unsafe impl Allocator for Sensitive {
 
 		debug_assert!(new.size() < old.size());
 
-		// Zero memory before shrinking
-		zero(ptr.as_ptr().add(new.size()), old.size() - new.size());
-
 		// Uncommit pages as needed
 		let size_old = page_align(old.size());
 		let size_new = page_align(new.size());
@@ -78,6 +80,14 @@ unsafe impl Allocator for Sensitive {
 		if size_old - size_new >= page_size() {
 			let tail = ptr.as_ptr().add(size_new);
 			let diff = size_old - size_new;
+
+			// Allow read‐write access before zeroing
+			if protect(tail, diff + Self::guard_size(), Protection::ReadWrite).is_err() {
+				handle_alloc_error(new);
+			}
+
+			// Zero memory before uncommiting
+			zero(tail, diff + Self::guard_size());
 
 			// Uncommit pages and protect new guard page
 			if uncommit(tail.add(Self::guard_size()), diff).is_err()
