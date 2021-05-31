@@ -338,4 +338,42 @@ mod tests {
 
 		assert_ne!(Vec::from("Warum Thunfische das?".to_string()), "");
 	}
+
+	#[test]
+	fn test_concurrent() {
+		use std::sync::Arc;
+		use std::thread;
+
+		const LIMIT: usize = 4194304;
+
+		let mut test: Vec<usize> = Vec::new();
+
+		{
+			let mut mutable = test.borrow_mut();
+
+			for i in 0..LIMIT {
+				mutable.push(i);
+			}
+		}
+
+		let arc = Arc::new(test);
+
+		let mut jhs = std::vec::Vec::new();
+
+		for _ in 0..std::cmp::min(16, 2 * thread::available_concurrency().unwrap().get()) {
+			let tref = arc.clone();
+
+			jhs.push(thread::spawn(move || {
+				let immutable = tref.borrow();
+
+				for i in 0..LIMIT {
+					assert_eq!(immutable[i], i);
+				}
+			}));
+		}
+
+		for jh in jhs {
+			jh.join().unwrap();
+		}
+	}
 }

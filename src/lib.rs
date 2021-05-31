@@ -1,5 +1,6 @@
 #![feature(
 	allocator_api,
+	available_concurrency,
 	cell_update,
 	core_intrinsics,
 	maybe_uninit_extra,
