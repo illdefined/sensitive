@@ -1,19 +1,16 @@
 use crate::auxiliary::zero;
+use crate::pages::{Pages, GuardedAlloc};
 use crate::alloc::Sensitive;
 use crate::guard::Guard;
-use crate::traits::{Pages, Protectable};
-
-use std::ptr::NonNull;
+use crate::traits::{AsPages, Protectable};
 
 pub(crate) type InnerBox<T> = std::boxed::Box<T, Sensitive>;
 pub type Box<T> = Guard<InnerBox<T>>;
 
-impl<T> Pages for InnerBox<T> {
-	fn pages(&self) -> Option<NonNull<[u8]>> {
+impl<T> AsPages for InnerBox<T> {
+	fn as_pages(&self) -> Option<Pages> {
 		if std::mem::size_of::<T>() > 0 {
-			Some(NonNull::slice_from_raw_parts(
-				NonNull::new((&**self as *const T).cast::<u8>() as *mut u8).unwrap(),
-				Sensitive::inner_size(std::mem::size_of::<T>())))
+			Some(unsafe { GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::from_ptr(&**self as *const T as *mut T, std::mem::size_of::<T>()).into_pages() })
 		} else {
 			None
 		}

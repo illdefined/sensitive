@@ -1,22 +1,20 @@
 use crate::auxiliary::zero;
+use crate::pages::{Pages, GuardedAlloc};
 use crate::alloc::Sensitive;
 use crate::guard::{Guard, Ref, RefMut};
-use crate::traits::{Pages, Protectable};
+use crate::traits::{AsPages, Protectable};
 
 use std::cmp::{PartialEq, min, max};
 use std::default::Default;
 use std::mem::MaybeUninit;
-use std::ptr::NonNull;
 
 pub(crate) type InnerVec<T> = std::vec::Vec<T, Sensitive>;
 pub type Vec<T> = Guard<InnerVec<T>>;
 
-impl<T> Pages for InnerVec<T> {
-	fn pages(&self) -> Option<NonNull<[u8]>> {
+impl<T> AsPages for InnerVec<T> {
+	fn as_pages(&self) -> Option<Pages> {
 		if self.capacity() > 0 {
-			Some(NonNull::slice_from_raw_parts(
-				NonNull::new(self.as_ptr().cast::<u8>() as *mut u8).unwrap(),
-				Sensitive::inner_size(self.capacity() * std::mem::size_of::<T>())))
+			Some(unsafe { GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::from_ptr(self.as_ptr() as *mut T, self.capacity() * std::mem::size_of::<T>()).into_pages() })
 		} else {
 			None
 		}

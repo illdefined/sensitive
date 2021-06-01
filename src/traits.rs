@@ -1,8 +1,9 @@
-use std::io::Error;
-use std::ptr::NonNull;
+use crate::pages::Pages;
 
-pub trait Pages {
-	fn pages(&self) -> Option<NonNull<[u8]>>;
+use std::io::Error;
+
+pub trait AsPages {
+	fn as_pages(&self) -> Option<Pages>;
 }
 
 pub trait Protectable {
