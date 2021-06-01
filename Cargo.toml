@@ -19,7 +19,7 @@ winapi = { version = "0.3", features = [ "memoryapi", "sysinfoapi", "winnt" ] }
 num_cpus = "1.13"
 rand = "0.8"
 
-[target.'cfg(unix)'.dev-dependencies]
+[target.'cfg(target_os = "linux")'.dev-dependencies]
 bulletproof = "0.2"
 
 [profile.release]

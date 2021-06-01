@@ -279,7 +279,7 @@ mod tests {
 		assert_eq!(align(granularity(), page_size()), granularity());
 	}
 
-	#[cfg(unix)]
+	#[cfg(target_os = "linux")]
 	#[test]
 	fn test_protection() {
 		use bulletproof::Bulletproof;
@@ -311,7 +311,7 @@ mod tests {
 		unsafe { release(buf, size) }.unwrap();
 	}
 
-	#[cfg(unix)]
+	#[cfg(target_os = "linux")]
 	#[test]
 	fn test_uncommit() {
 		use bulletproof::Bulletproof;

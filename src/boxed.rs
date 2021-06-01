@@ -42,7 +42,7 @@ impl<T> Box<T> {
 mod tests {
 	use super::*;
 
-	#[cfg(unix)]
+	#[cfg(target_os = "linux")]
 	#[test]
 	fn test_protection() {
 		use bulletproof::Bulletproof;

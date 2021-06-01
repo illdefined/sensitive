@@ -227,7 +227,7 @@ impl PartialEq<&str> for RefMut<'_, InnerVec<u8>> {
 mod tests {
 	use super::*;
 
-	#[cfg(unix)]
+	#[cfg(target_os = "linux")]
 	#[test]
 	fn test_protection() {
 		use bulletproof::Bulletproof;

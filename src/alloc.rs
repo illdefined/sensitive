@@ -165,7 +165,7 @@ mod tests {
 		test_raw_range(4194304..268435456, 4);
 	}
 
-	#[cfg(unix)]
+	#[cfg(target_os = "Linux")]
 	#[test]
 	fn test_raw_guard() {
 		use bulletproof::Bulletproof;
@@ -194,7 +194,7 @@ mod tests {
 		unsafe { Sensitive.deallocate(alloc.cast::<u8>(), layout); }
 	}
 
-	#[cfg(unix)]
+	#[cfg(target_os = "linux")]
 	#[test]
 	fn test_raw_shrink() {
 		use bulletproof::Bulletproof;
