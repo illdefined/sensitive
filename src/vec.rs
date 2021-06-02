@@ -322,7 +322,8 @@ mod tests {
 
 	#[test]
 	fn test_concurrent() {
-		use std::sync::Arc;
+		use std::cmp::max;
+		use std::sync::{Arc, Barrier};
 		use std::thread;
 
 		const LIMIT: usize = 4194304;
@@ -337,24 +338,80 @@ mod tests {
 			}
 		}
 
-		let arc = Arc::new(test);
+		let concurrency = max(16, 2 * thread::available_concurrency().unwrap().get());
+		let barrier = Arc::new(Barrier::new(concurrency));
+		let vec = Arc::new(test);
+		let mut threads = std::vec::Vec::with_capacity(concurrency);
 
-		let mut jhs = std::vec::Vec::new();
+		for _ in 0..concurrency {
+			let barrier = barrier.clone();
+			let vec = vec.clone();
 
-		for _ in 0..std::cmp::min(16, 2 * thread::available_concurrency().unwrap().get()) {
-			let tref = arc.clone();
-
-			jhs.push(thread::spawn(move || {
-				let immutable = tref.borrow();
+			threads.push(thread::spawn(move || {
+				barrier.wait();
 
 				for i in 0..LIMIT {
+					let immutable = vec.borrow();
 					assert_eq!(immutable[i], i);
 				}
 			}));
 		}
 
-		for jh in jhs {
-			jh.join().unwrap();
+		for thread in threads {
+			thread.join().unwrap();
+		}
+	}
+
+	#[test]
+	fn test_concurrent_rw() {
+		use std::cmp::max;
+		use std::sync::{Arc, Barrier, RwLock};
+		use std::thread;
+
+		const LIMIT: usize = 32768;
+
+		let mut test: Vec<usize> = Vec::new();
+
+		{
+			let mut mutable = test.borrow_mut();
+
+			for _ in 0..LIMIT {
+				mutable.push(0);
+			}
+		}
+
+		let concurrency = max(16, 2 * thread::available_concurrency().unwrap().get());
+		let barrier = Arc::new(Barrier::new(concurrency));
+		let lock = Arc::new(RwLock::new(test));
+		let mut threads = std::vec::Vec::with_capacity(concurrency);
+
+		for _ in 0..concurrency {
+			let barrier = barrier.clone();
+			let lock = lock.clone();
+
+			threads.push(thread::spawn(move || {
+				barrier.wait();
+
+				for i in 0..LIMIT {
+					{
+						let mut vec = lock.write().unwrap();
+						let mut mutable = vec.borrow_mut();
+
+						mutable[i] = i;
+					}
+
+					{
+						let vec = lock.read().unwrap();
+						let immutable = vec.borrow();
+
+						assert_eq!(immutable[i], i);
+					}
+				}
+			}));
+		}
+
+		for thread in threads {
+			thread.join().unwrap();
 		}
 	}
 }
