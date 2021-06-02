@@ -203,6 +203,10 @@ impl<T> RefMut<'_, InnerVec<T>> {
 	pub fn shrink_to_fit(&mut self) {
 		self.inner_mut().shrink_to_fit();
 	}
+
+	pub fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+		self.inner_mut().extend(iter);
+	}
 }
 
 impl<T, U> PartialEq<[U]> for RefMut<'_, InnerVec<T>>
