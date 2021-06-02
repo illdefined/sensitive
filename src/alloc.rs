@@ -7,17 +7,17 @@ use std::ptr::NonNull;
 pub struct Sensitive;
 
 impl Sensitive {
-	pub const GUARD_PAGES: usize = 1;
+	pub(crate) const GUARD_PAGES: usize = 1;
 
-	pub fn guard_size() -> usize {
+	pub(crate) fn guard_size() -> usize {
 		Self::GUARD_PAGES * page_size()
 	}
 
-	pub fn outer_size(size: usize) -> usize {
+	pub(crate) fn outer_size(size: usize) -> usize {
 		alloc_align(size + 2 * Self::guard_size())
 	}
 
-	pub fn inner_size(size: usize) -> usize {
+	pub(crate) fn inner_size(size: usize) -> usize {
 		Self::outer_size(size) - 2 * Self::guard_size()
 	}
 }

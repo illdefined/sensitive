@@ -6,7 +6,7 @@ use crate::traits::{Pages, Protectable};
 use std::cmp::PartialEq;
 use std::ptr::NonNull;
 
-type InnerVec<T> = std::vec::Vec<T, Sensitive>;
+pub(crate) type InnerVec<T> = std::vec::Vec<T, Sensitive>;
 pub type Vec<T> = Guard<InnerVec<T>>;
 
 impl<T> Pages for InnerVec<T> {
@@ -44,7 +44,7 @@ impl<T> Vec<T> {
 		guard
 	}
 
-	fn with_capacity_unprotected(capacity: usize) -> Self {
+	pub(crate) fn with_capacity_unprotected(capacity: usize) -> Self {
 		Guard::from_inner(std::vec::Vec::with_capacity_in(capacity, Sensitive))
 	}
 

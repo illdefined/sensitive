@@ -90,15 +90,15 @@ impl<T: Protectable> Guard<T> {
 		self
 	}
 
-	pub unsafe fn inner(&self) -> &T {
+	pub(crate) unsafe fn inner(&self) -> &T {
 		&self.1
 	}
 
-	pub unsafe fn inner_mut(&mut self) -> &mut T {
+	pub(crate) unsafe fn inner_mut(&mut self) -> &mut T {
 		&mut self.1
 	}
 
-	pub fn mutate<M, R>(&mut self, mut mutation: M) -> &Self
+	pub(crate) fn mutate<M, R>(&mut self, mut mutation: M) -> &Self
 		where M: FnMut(&mut T) -> R {
 		debug_assert_eq!(self.0.swap(Self::ACC | Self::MUT, Ordering::AcqRel), 0);
 		mutation(&mut self.1);

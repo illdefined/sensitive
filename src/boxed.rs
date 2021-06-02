@@ -5,8 +5,8 @@ use crate::traits::{Pages, Protectable};
 
 use std::ptr::NonNull;
 
-type InnerBox<T> = std::boxed::Box<T, Sensitive>;
-type Box<T> = Guard<InnerBox<T>>;
+pub(crate) type InnerBox<T> = std::boxed::Box<T, Sensitive>;
+pub type Box<T> = Guard<InnerBox<T>>;
 
 impl<T> Pages for InnerBox<T> {
 	fn pages(&self) -> Option<NonNull<[u8]>> {
@@ -21,7 +21,7 @@ impl<T> Pages for InnerBox<T> {
 }
 
 impl<T> Box<T> {
-	fn new_without_clear(source: T) -> Self {
+	pub(crate) fn new_without_clear(source: T) -> Self {
 		let mut guard = Guard::from_inner(std::boxed::Box::new_in(source, Sensitive));
 		guard.mutate(|boxed| boxed.lock().unwrap());
 		guard
