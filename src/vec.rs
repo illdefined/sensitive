@@ -168,6 +168,11 @@ impl<T, U> PartialEq<&[U]> for Ref<'_, InnerVec<T>>
 	}
 }
 
+impl<T> Ref<'_, InnerVec<T>> {
+	pub fn as_slice(&self) -> &[T] {
+		unsafe { self.0.inner() }.as_slice()
+	}
+}
 
 impl<T, U, const N: usize> PartialEq<[U; N]> for Ref<'_, InnerVec<T>>
 	where T: PartialEq<U> {
@@ -183,6 +188,10 @@ impl PartialEq<&str> for Ref<'_, InnerVec<u8>> {
 }
 
 impl<T> RefMut<'_, InnerVec<T>> {
+	pub fn as_slice(&self) -> &[T] {
+		unsafe { self.0.inner() }.as_slice()
+	}
+
 	pub fn push(&mut self, value: T) {
 		self.inner_mut().push(value);
 	}
