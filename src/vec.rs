@@ -4,6 +4,7 @@ use crate::guard::{Guard, Ref, RefMut};
 use crate::traits::{Pages, Protectable};
 
 use std::cmp::PartialEq;
+use std::default::Default;
 use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 
@@ -91,6 +92,12 @@ impl<T> Vec<T> {
 
 	pub fn as_mut_ptr(&mut self) -> *mut T {
 		unsafe { self.inner_mut().as_mut_ptr() }
+	}
+}
+
+impl<T> Default for Vec<T> {
+	fn default() -> Self {
+		Self::new()
 	}
 }
 

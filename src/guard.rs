@@ -1,6 +1,5 @@
 use crate::traits::Protectable;
 
-use std::default::Default;
 use std::fmt;
 use std::ops::{Deref, DerefMut, Index, IndexMut, Drop};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -112,12 +111,6 @@ impl<T: Protectable> Guard<T> {
 
 	pub fn borrow_mut(&mut self) -> RefMut<'_, T> {
 		RefMut(self.acquire_mut())
-	}
-}
-
-impl<T: Protectable + Default> Default for Guard<T> {
-	fn default() -> Self {
-		Self(AtomicUsize::default(), T::default())
 	}
 }
 

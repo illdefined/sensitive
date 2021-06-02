@@ -38,6 +38,12 @@ impl<T> Box<T> {
 	}
 }
 
+impl<T: Default> Default for Box<T> {
+	fn default() -> Self {
+		Self::new_without_clear(T::default())
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
