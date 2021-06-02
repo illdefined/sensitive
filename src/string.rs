@@ -10,7 +10,7 @@ use std::str::Chars;
 use unicode_normalization::UnicodeNormalization;
 use unicode_normalization::char::decompose_canonical;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct String(Vec<u8>);
 
 #[derive(Debug)]
