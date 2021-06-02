@@ -4,6 +4,7 @@ use crate::guard::{Guard, Ref, RefMut};
 use crate::traits::{Pages, Protectable};
 
 use std::cmp::PartialEq;
+use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 
 pub(crate) type InnerVec<T> = std::vec::Vec<T, Sensitive>;
@@ -192,6 +193,10 @@ impl<T> RefMut<'_, InnerVec<T>> {
 		unsafe { self.0.inner() }.as_slice()
 	}
 
+	pub fn len(&self) -> usize {
+		unsafe { self.0.inner() }.len()
+	}
+
 	pub fn push(&mut self, value: T) {
 		self.inner_mut().push(value);
 	}
@@ -204,8 +209,31 @@ impl<T> RefMut<'_, InnerVec<T>> {
 		self.inner_mut().shrink_to_fit();
 	}
 
-	pub fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+	pub fn extend<I>(&mut self, iter: I)
+		where I: IntoIterator<Item = T> {
 		self.inner_mut().extend(iter);
+	}
+
+	pub fn spare_capacity_mut(&mut self) -> &mut [MaybeUninit<T>] {
+		self.inner_mut().spare_capacity_mut()
+	}
+
+	pub fn reserve(&mut self, capacity: usize) {
+		self.inner_mut().reserve(capacity);
+	}
+
+	pub fn reserve_exact(&mut self, capacity: usize) {
+		self.inner_mut().reserve_exact(capacity);
+	}
+
+	pub unsafe fn set_len(&mut self, len: usize) {
+		self.inner_mut().set_len(len);
+	}
+}
+
+impl<T: Clone> RefMut<'_, InnerVec<T>> {
+	pub fn resize(&mut self, len: usize, value: T) {
+		self.inner_mut().resize(len, value);
 	}
 }
 
