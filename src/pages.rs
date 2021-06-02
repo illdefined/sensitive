@@ -237,24 +237,27 @@ pub unsafe fn unlock(addr: *mut u8, size: usize) -> Result<(), Error> {
 
 impl<T: Pages> Protectable for T {
 	fn lock(&self) -> Result<(), Error> {
-		Ok(match self.pages() {
-			Some(pages) => unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::NoAccess)? },
-			None => ()
-		})
+		if let Some(pages) = self.pages() {
+			unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::NoAccess)? }
+		}
+
+		Ok(())
 	}
 
 	fn unlock(&self) -> Result<(), Error> {
-		Ok(match self.pages() {
-			Some(pages) => unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::ReadOnly)? },
-			None => ()
-		})
+		if let Some(pages) = self.pages() {
+			unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::ReadOnly)? }
+		}
+
+		Ok(())
 	}
 
 	fn unlock_mut(&mut self) -> Result<(), Error> {
-		Ok(match self.pages() {
-			Some(pages) => unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::ReadWrite)? },
-			None => ()
-		})
+		if let Some(pages) = self.pages() {
+			unsafe { protect(pages.as_mut_ptr(), pages.len(), Protection::ReadWrite)? }
+		}
+
+		Ok(())
 	}
 }
 
