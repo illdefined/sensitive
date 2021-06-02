@@ -17,7 +17,7 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn test_is_power_of_two() {
+	fn power_of_two() {
 		let mut p = 2;
 
 		while p < usize::MAX / 2 {
@@ -27,7 +27,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_not_is_power_of_two() {
+	fn not_power_of_two() {
 		let mut p = 2;
 
 		while p <= 4194304 {
@@ -40,7 +40,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_align() {
+	fn alignment() {
 		assert_eq!(align(0, 4096), 0);
 
 		for i in 1..4096 {

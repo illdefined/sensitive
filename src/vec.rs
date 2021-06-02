@@ -229,7 +229,7 @@ mod tests {
 
 	#[cfg(target_os = "linux")]
 	#[test]
-	fn test_protection() {
+	fn protection() {
 		use bulletproof::Bulletproof;
 
 		let mut test = Vec::<u8>::new();
@@ -259,7 +259,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_vec_seq() {
+	fn vec_seq() {
 		const LIMIT: usize = 4194304;
 
 		let mut test: Vec<usize> = Vec::new();
@@ -282,7 +282,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_vec_rng() {
+	fn vec_rng() {
 		use rand::prelude::*;
 
 		const LIMIT: usize = 4194304;
@@ -306,7 +306,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_eq() {
+	fn eq() {
 		assert_eq!(Vec::<u8>::from(vec![]), []);
 		assert_eq!(Vec::<u8>::from(vec![0x00]), [0x00]);
 
@@ -321,7 +321,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_concurrent() {
+	fn concurrent() {
 		use std::cmp::max;
 		use std::sync::{Arc, Barrier};
 		use std::thread;
@@ -363,7 +363,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_concurrent_rw() {
+	fn concurrent_rw() {
 		use std::cmp::max;
 		use std::sync::{Arc, Barrier, RwLock};
 		use std::thread;

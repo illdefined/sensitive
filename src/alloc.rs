@@ -115,7 +115,7 @@ unsafe impl Allocator for Sensitive {
 mod tests {
 	use super::*;
 
-	fn test_raw_range(range: std::ops::Range<usize>, samples: usize) {
+	fn raw_range(range: std::ops::Range<usize>, samples: usize) {
 		use rand::distributions::{Distribution, Uniform};
 
 		let mut rng = rand::thread_rng();
@@ -141,33 +141,33 @@ mod tests {
 	}
 
 	#[test]
-	fn test_raw_tiny() {
-		test_raw_range(0..4096, 4096);
+	fn raw_tiny() {
+		raw_range(0..4096, 4096);
 	}
 
 	#[test]
-	fn test_raw_small() {
-		test_raw_range(4096..65536, 256);
+	fn raw_small() {
+		raw_range(4096..65536, 256);
 	}
 
 	#[test]
-	fn test_raw_medium() {
-		test_raw_range(65536..4194304, 64);
+	fn raw_medium() {
+		raw_range(65536..4194304, 64);
 	}
 
 	#[test]
-	fn test_raw_large() {
-		test_raw_range(4194304..16777216, 16);
+	fn raw_large() {
+		raw_range(4194304..16777216, 16);
 	}
 
 	#[test]
-	fn test_raw_huge() {
-		test_raw_range(4194304..268435456, 4);
+	fn raw_huge() {
+		raw_range(4194304..268435456, 4);
 	}
 
 	#[cfg(target_os = "Linux")]
 	#[test]
-	fn test_raw_guard() {
+	fn raw_guard() {
 		use bulletproof::Bulletproof;
 
 		let size = alloc_align(4194304);
@@ -196,7 +196,7 @@ mod tests {
 
 	#[cfg(target_os = "linux")]
 	#[test]
-	fn test_raw_shrink() {
+	fn raw_shrink() {
 		use bulletproof::Bulletproof;
 
 		let size = granularity() + Sensitive::guard_size();
@@ -236,7 +236,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_vec_seq() {
+	fn vec_seq() {
 		const LIMIT: usize = 4194304;
 
 		let mut test: Vec<usize, _> = Vec::new_in(Sensitive);
@@ -251,7 +251,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_vec_rng() {
+	fn vec_rng() {
 		use rand::prelude::*;
 
 		const LIMIT: usize = 4194304;

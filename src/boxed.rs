@@ -44,7 +44,7 @@ mod tests {
 
 	#[cfg(target_os = "linux")]
 	#[test]
-	fn test_protection() {
+	fn protection() {
 		use bulletproof::Bulletproof;
 
 		let mut test = Box::<u32>::new(0x55555555);
