@@ -2,6 +2,7 @@ use crate::auxiliary::zero;
 use crate::guard;
 use crate::vec::{InnerVec, Vec};
 
+use std::cmp::{PartialEq, min, max};
 use std::convert::From;
 use std::iter::FromIterator;
 use std::mem::MaybeUninit;
@@ -20,6 +21,21 @@ pub struct Ref<'t>(guard::Ref<'t, InnerVec<u8>>);
 pub struct RefMut<'t>(guard::RefMut<'t, InnerVec<u8>>);
 
 impl String {
+	const CMP_MIN: usize = 32;
+
+	fn eq_vec(a: &InnerVec<u8>, b: &InnerVec<u8>) -> bool {
+		if a.capacity() == 0 {
+			debug_assert!(a.is_empty());
+			b.is_empty()
+		} else {
+			debug_assert!(a.capacity() >= Self::CMP_MIN);
+
+			b.iter().take(a.capacity()).enumerate().fold(0, |d, (i, e)| {
+				d | unsafe { a.as_ptr().add(i).read() as usize ^ *e as usize }
+			}) | (max(a.len(), b.len()) - min(a.len(), b.len())) == 0
+		}
+	}
+
 	pub fn new() -> Self {
 		Self(Vec::new())
 	}
@@ -121,6 +137,12 @@ impl Ref<'_> {
 	}
 }
 
+impl PartialEq<Self> for Ref<'_> {
+	fn eq(&self, other: &Self) -> bool {
+		String::eq_vec(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+	}
+}
+
 impl RefMut<'_> {
 	pub fn as_bytes(&self) -> &[u8] {
 		self.0.as_slice()
@@ -167,5 +189,25 @@ impl RefMut<'_> {
 		let ch = self.chars().rev().next()?;
 		unsafe { self.0.0.set_len(self.0.len() - ch.len_utf8()); }
 		Some(ch)
+	}
+}
+
+impl PartialEq<Self> for RefMut<'_> {
+	fn eq(&self, other: &Self) -> bool {
+		String::eq_vec(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn eq() {
+		assert_eq!(String::from("").borrow(), String::from("").borrow());
+		assert_eq!(String::from("ÄÖÜäöüß").borrow(), String::from("A\u{308}O\u{308}U\u{308}a\u{308}o\u{308}u\u{308}ß").borrow());
+
+		assert_ne!(String::from("empty").borrow(), String::from("").borrow());
+		assert_ne!(String::from("Warum Thunfische das?").borrow(), String::from("Darum Thunfische das!").borrow());
 	}
 }
