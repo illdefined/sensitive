@@ -83,7 +83,7 @@ impl<T> Vec<T> {
 	}
 
 	pub unsafe fn set_len(&mut self, len: usize) {
-		self.mutate(|vec| vec.set_len(len));
+		self.inner_mut().set_len(len);
 	}
 
 	pub fn as_ptr(&self) -> *const T {
