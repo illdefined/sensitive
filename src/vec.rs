@@ -3,7 +3,7 @@ use crate::alloc::Sensitive;
 use crate::guard::{Guard, Ref, RefMut};
 use crate::traits::{Pages, Protectable};
 
-use std::cmp::PartialEq;
+use std::cmp::{PartialEq, min, max};
 use std::default::Default;
 use std::mem::MaybeUninit;
 use std::ptr::NonNull;
@@ -26,17 +26,17 @@ impl<T> Pages for InnerVec<T> {
 impl<T> Vec<T> {
 	const CMP_MIN: usize = 32;
 
-	fn eq_slice<U>(a: &Vec<T>, b: &[U]) -> bool
-		where T: PartialEq<U> {
+	fn eq_slice<U: Copy + Into<usize>>(a: &Vec<T>, b: &[U]) -> bool
+		where T: Copy + Into<usize> {
 		if a.capacity() == 0 {
 			debug_assert!(a.is_empty());
 			b.is_empty()
 		} else {
-			assert!(a.capacity() >= Self::CMP_MIN);
+			debug_assert!(a.capacity() >= Self::CMP_MIN);
 
-			b.iter().take(a.capacity()).enumerate().fold(true, |d, (i, e)| {
-				d & unsafe { a.as_ptr().add(i).read() == *e }
-			}) & (a.len() == b.len())
+			b.iter().take(a.capacity()).enumerate().fold(0, |d, (i, e)| {
+				d | unsafe { a.as_ptr().add(i).read().into() ^ (*e).into() }
+			}) | (max(a.len(), b.len()) - min(a.len(), b.len())) == 0
 		}
 	}
 
@@ -135,22 +135,19 @@ impl From<std::string::String> for Vec<u8> {
 	}
 }
 
-impl<T, U> PartialEq<[U]> for Vec<T>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<[U]> for Vec<T> {
 	fn eq(&self, other: &[U]) -> bool {
 		self.borrow() == other
 	}
 }
 
-impl<T, U> PartialEq<&[U]> for Vec<T>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<&[U]> for Vec<T> {
 	fn eq(&self, other: &&[U]) -> bool {
 		&self.borrow() == other
 	}
 }
 
-impl<T, U, const N: usize> PartialEq<[U; N]> for Vec<T>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>, const N: usize> PartialEq<[U; N]> for Vec<T> {
 	fn eq(&self, other: &[U; N]) -> bool {
 		&self.borrow() == other
 	}
@@ -162,15 +159,13 @@ impl PartialEq<&str> for Vec<u8> {
 	}
 }
 
-impl<T, U> PartialEq<[U]> for Ref<'_, InnerVec<T>>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<[U]> for Ref<'_, InnerVec<T>> {
 	fn eq(&self, other: &[U]) -> bool {
 		Vec::<T>::eq_slice(self.0, other)
 	}
 }
 
-impl<T, U> PartialEq<&[U]> for Ref<'_, InnerVec<T>>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<&[U]> for Ref<'_, InnerVec<T>> {
 	fn eq(&self, other: &&[U]) -> bool {
 		self == *other
 	}
@@ -182,8 +177,7 @@ impl<T> Ref<'_, InnerVec<T>> {
 	}
 }
 
-impl<T, U, const N: usize> PartialEq<[U; N]> for Ref<'_, InnerVec<T>>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>, const N: usize> PartialEq<[U; N]> for Ref<'_, InnerVec<T>> {
 	fn eq(&self, other: &[U; N]) -> bool {
 		self == other as &[U]
 	}
@@ -244,22 +238,19 @@ impl<T: Clone> RefMut<'_, InnerVec<T>> {
 	}
 }
 
-impl<T, U> PartialEq<[U]> for RefMut<'_, InnerVec<T>>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<[U]> for RefMut<'_, InnerVec<T>> {
 	fn eq(&self, other: &[U]) -> bool {
 		Vec::<T>::eq_slice(self.0, other)
 	}
 }
 
-impl<T, U> PartialEq<&[U]> for RefMut<'_, InnerVec<T>>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<&[U]> for RefMut<'_, InnerVec<T>> {
 	fn eq(&self, other: &&[U]) -> bool {
 		self == *other
 	}
 }
 
-impl<T, U, const N: usize> PartialEq<[U; N]> for RefMut<'_, InnerVec<T>>
-	where T: PartialEq<U> {
+impl<T: Copy + Into<usize>, U: Copy + Into<usize>, const N: usize> PartialEq<[U; N]> for RefMut<'_, InnerVec<T>> {
 	fn eq(&self, other: &[U; N]) -> bool {
 		self == other as &[U]
 	}
@@ -355,12 +346,12 @@ mod tests {
 
 	#[test]
 	fn eq() {
-		assert_eq!(Vec::<u8>::from(vec![]), []);
-		assert_eq!(Vec::<u8>::from(vec![0x00]), [0x00]);
+		assert_eq!(Vec::<u8>::from(vec![]), [] as [u8; 0]);
+		assert_eq!(Vec::<u8>::from(vec![0x00]), [0u8]);
 
-		assert_ne!(Vec::<u8>::from(vec![]), [0x00]);
-		assert_ne!(Vec::<u8>::from(vec![0x00]), []);
-		assert_ne!(Vec::<u8>::from(vec![0x00]), [0x55]);
+		assert_ne!(Vec::<u8>::from(vec![]), [0u8]);
+		assert_ne!(Vec::<u8>::from(vec![0x00]), [] as [u8; 0]);
+		assert_ne!(Vec::<u8>::from(vec![0x00]), [0x55u8]);
 
 		assert_eq!(Vec::from("".to_string()), "");
 		assert_eq!(Vec::from("Some secret".to_string()), "Some secret");
