@@ -135,11 +135,11 @@ impl RefMut<'_> {
 	}
 
 	pub fn reserve(&mut self, capacity: usize) {
-		self.0.0.reserve(capacity);
+		self.0.reserve(capacity);
 	}
 
 	pub fn reserve_exact(&mut self, capacity: usize) {
-		self.0.0.reserve_exact(capacity);
+		self.0.reserve_exact(capacity);
 	}
 
 	pub fn push(&mut self, ch: char) {
