@@ -143,6 +143,12 @@ impl PartialEq<Self> for Ref<'_> {
 	}
 }
 
+impl PartialEq<RefMut<'_>> for Ref<'_> {
+	fn eq(&self, other: &RefMut<'_>) -> bool {
+		String::eq_vec(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+	}
+}
+
 impl RefMut<'_> {
 	pub fn as_bytes(&self) -> &[u8] {
 		self.0.as_slice()
@@ -194,6 +200,12 @@ impl RefMut<'_> {
 
 impl PartialEq<Self> for RefMut<'_> {
 	fn eq(&self, other: &Self) -> bool {
+		String::eq_vec(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+	}
+}
+
+impl PartialEq<Ref<'_>> for RefMut<'_> {
+	fn eq(&self, other: &Ref<'_>) -> bool {
 		String::eq_vec(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
 	}
 }
