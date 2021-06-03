@@ -223,4 +223,17 @@ mod tests {
 		assert_ne!(String::from("empty").borrow(), String::from("").borrow());
 		assert_ne!(String::from("Warum Thunfische das?").borrow(), String::from("Darum Thunfische das!").borrow());
 	}
+
+	#[test]
+	fn pop() {
+		let mut string = String::from("Warum Thunfische das?");
+		let mut immutable = string.borrow_mut();
+
+		assert_eq!(immutable.pop(), Some('?'));
+		assert_eq!(immutable.pop(), Some('s'));
+		assert_eq!(immutable.pop(), Some('a'));
+		assert_eq!(immutable.pop(), Some('d'));
+		assert_eq!(immutable.pop(), Some(' '));
+		assert_eq!(immutable, String::from("Warum Thunfische").borrow());
+	}
 }
