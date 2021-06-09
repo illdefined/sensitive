@@ -139,13 +139,13 @@ impl Ref<'_> {
 
 impl PartialEq<Self> for Ref<'_> {
 	fn eq(&self, other: &Self) -> bool {
-		String::eq_slice(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}
 }
 
 impl PartialEq<RefMut<'_>> for Ref<'_> {
 	fn eq(&self, other: &RefMut<'_>) -> bool {
-		String::eq_slice(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}
 }
 
@@ -201,13 +201,13 @@ impl RefMut<'_> {
 
 impl PartialEq<Self> for RefMut<'_> {
 	fn eq(&self, other: &Self) -> bool {
-		String::eq_slice(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}
 }
 
 impl PartialEq<Ref<'_>> for RefMut<'_> {
 	fn eq(&self, other: &Ref<'_>) -> bool {
-		String::eq_slice(unsafe { &self.0.0.inner() }, unsafe { &other.0.0.inner() })
+		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}
 }
 
