@@ -29,4 +29,4 @@ rand = "0.8"
 bulletproof = "0.2"
 
 [profile.release]
-lto = true
+lto = "thin"
