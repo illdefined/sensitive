@@ -30,3 +30,9 @@ bulletproof = "0.2"
 
 [profile.release]
 lto = "thin"
+
+[profile.test]
+lto = "thin"
+
+[profile.bench]
+lto = "thin"
