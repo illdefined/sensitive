@@ -32,6 +32,7 @@ bulletproof = "0.2"
 lto = "thin"
 
 [profile.test]
+opt-level = 1
 lto = "thin"
 
 [profile.bench]
