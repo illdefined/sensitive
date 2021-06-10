@@ -1,3 +1,5 @@
+//! Guarded [box](std::boxed) type
+
 use crate::auxiliary::zero;
 use crate::pages::{Pages, GuardedAlloc};
 use crate::alloc::Sensitive;
@@ -5,6 +7,8 @@ use crate::guard::Guard;
 use crate::traits::{AsPages, Protectable};
 
 pub(crate) type InnerBox<T> = std::boxed::Box<T, Sensitive>;
+
+/// Guarded [box](std::boxed::Box) type
 pub type Box<T> = Guard<InnerBox<T>>;
 
 impl<T> AsPages for InnerBox<T> {

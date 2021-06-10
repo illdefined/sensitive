@@ -1,3 +1,5 @@
+//! Guarded [vector](mod@std::vec) type
+
 use crate::auxiliary::zero;
 use crate::pages::{Pages, GuardedAlloc};
 use crate::alloc::Sensitive;
@@ -9,6 +11,8 @@ use std::default::Default;
 use std::mem::MaybeUninit;
 
 pub(crate) type InnerVec<T> = std::vec::Vec<T, Sensitive>;
+
+/// Guarded [vector](std::vec::Vec) type
 pub type Vec<T> = Guard<InnerVec<T>>;
 
 impl<T> AsPages for InnerVec<T> {

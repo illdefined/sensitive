@@ -1,11 +1,18 @@
+//! Atomically reference‐counted access guard
+
 use crate::traits::Protectable;
 
 use std::fmt;
 use std::ops::{Deref, DerefMut, Index, IndexMut, Drop};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// Atomically reference‐counted access guard
 pub struct Guard<T: Protectable>(AtomicUsize, T);
+
+/// Reference to immutably borrowed guarded value
 pub struct Ref<'t, T: Protectable>(pub &'t Guard<T>);
+
+/// Reference to mutably borrowed guarded value
 pub struct RefMut<'t, T: Protectable>(pub &'t mut Guard<T>);
 
 impl<T: Protectable> Guard<T> {

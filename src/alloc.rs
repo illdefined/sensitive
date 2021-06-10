@@ -1,12 +1,16 @@
+//! Memory allocators
+
 use crate::auxiliary::zero;
 use crate::pages::{Pages, GuardedAlloc, Protection};
 
 use std::alloc::{Allocator, AllocError, Layout, handle_alloc_error};
 use std::ptr::NonNull;
 
+/// Allocator for sensitive information
 pub struct Sensitive;
 
 impl Sensitive {
+	/// Number of guard pages
 	pub(crate) const GUARD_PAGES: usize = 1;
 }
 

@@ -1,3 +1,5 @@
+//! Common traits
+
 use crate::pages::Pages;
 
 use std::io::Error;

@@ -1,3 +1,5 @@
+//! Guarded [string](std::string) type
+
 use crate::auxiliary::zero;
 use crate::guard;
 use crate::vec::{InnerVec, Vec};
@@ -11,12 +13,15 @@ use std::str::Chars;
 use unicode_normalization::UnicodeNormalization;
 use unicode_normalization::char::decompose_canonical;
 
+/// Guarded [string](std::string::String) type
 #[derive(Debug, Default)]
 pub struct String(Vec<u8>);
 
+/// Reference to immutably borrowed guarded [`String`]
 #[derive(Debug)]
 pub struct Ref<'t>(guard::Ref<'t, InnerVec<u8>>);
 
+/// Reference to mutably borrowed guarded [`String`]
 #[derive(Debug)]
 pub struct RefMut<'t>(guard::RefMut<'t, InnerVec<u8>>);
 
