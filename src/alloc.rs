@@ -219,7 +219,7 @@ mod tests {
 
 	#[test]
 	fn vec_seq() {
-		const LIMIT: usize = 4194304;
+		const LIMIT: usize = 1048576;
 
 		let mut test: Vec<usize, _> = Vec::new_in(Sensitive);
 
@@ -236,7 +236,7 @@ mod tests {
 	fn vec_rng() {
 		use rand::prelude::*;
 
-		const LIMIT: usize = 4194304;
+		const LIMIT: usize = 1048576;
 
 		let mut rng = rand::thread_rng();
 		let mut test: Vec<u8, _> = Vec::new_in(Sensitive);

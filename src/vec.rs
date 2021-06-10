@@ -297,7 +297,7 @@ mod tests {
 
 	#[test]
 	fn vec_seq() {
-		const LIMIT: usize = 4194304;
+		const LIMIT: usize = 1048576;
 
 		let mut test: Vec<usize> = Vec::new();
 
@@ -322,7 +322,7 @@ mod tests {
 	fn vec_rng() {
 		use rand::prelude::*;
 
-		const LIMIT: usize = 4194304;
+		const LIMIT: usize = 1048576;
 
 		let mut rng = rand::thread_rng();
 		let mut test: Vec<u8> = Vec::new();
@@ -363,7 +363,7 @@ mod tests {
 		use std::sync::{Arc, Barrier};
 		use std::thread;
 
-		const LIMIT: usize = 4194304;
+		const LIMIT: usize = 262144;
 
 		let mut test: Vec<usize> = Vec::new();
 
