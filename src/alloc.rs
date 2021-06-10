@@ -161,7 +161,7 @@ mod tests {
 		}
 
 		// Trailing guard
-		for i in size + 1 .. GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::guard_size() {
+		for i in size .. GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 
