@@ -472,11 +472,16 @@ mod tests {
 
 			assert!(alloc.size() >= size);
 
-			for i in 0..alloc.size() {
-				let ptr = unsafe { alloc.as_ptr::<u8>().add(i) };
-				assert_eq!(unsafe { ptr.read() }, 0);
-				unsafe { ptr.write(0x55) };
-				assert_eq!(unsafe { ptr.read() }, 0x55);
+			let slice = unsafe { std::slice::from_raw_parts_mut(alloc.as_ptr::<u8>(), alloc.size()) };
+
+			for elem in slice.iter() {
+				assert_eq!(*elem, 0);
+			}
+
+			slice.fill(0x55);
+
+			for elem in slice.iter() {
+				assert_eq!(*elem, 0x55);
 			}
 		}
 	}
@@ -584,11 +589,16 @@ mod tests {
 
 			assert!(alloc.inner().size() >= size);
 
-			for i in 0..alloc.inner().size() {
-				let ptr = unsafe { alloc.inner().as_ptr::<u8>().add(i) };
-				assert_eq!(unsafe { ptr.read() }, 0);
-				unsafe { ptr.write(0x55) };
-				assert_eq!(unsafe { ptr.read() }, 0x55);
+			let slice = unsafe { std::slice::from_raw_parts_mut(alloc.inner().as_ptr::<u8>(), alloc.inner().size()) };
+
+			for elem in slice.iter() {
+				assert_eq!(*elem, 0);
+			}
+
+			slice.fill(0x55);
+
+			for elem in slice.iter() {
+				assert_eq!(*elem, 0x55);
 			}
 		}
 	}

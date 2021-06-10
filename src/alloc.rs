@@ -100,13 +100,18 @@ mod tests {
 			eprintln!("Allocating {} bytes", size);
 
 			let layout = Layout::from_size_align(size, 1).unwrap();
-			let alloc = Sensitive.allocate(layout).unwrap();
+			let mut alloc = Sensitive.allocate(layout).unwrap();
 
-			for i in 0..size {
-				let ptr = unsafe { alloc.cast::<u8>().as_ptr().add(i) };
-				assert_eq!(unsafe { ptr.read() }, 0);
-				unsafe { ptr.write(0x55) };
-				assert_eq!(unsafe { ptr.read() }, 0x55);
+			let slice = unsafe { alloc.as_mut() };
+
+			for elem in slice.iter() {
+				assert_eq!(*elem, 0);
+			}
+
+			slice.fill(0x55);
+
+			for elem in slice.iter() {
+				assert_eq!(*elem, 0x55);
 			}
 
 			unsafe { Sensitive.deallocate(alloc.cast::<u8>(), layout); }
