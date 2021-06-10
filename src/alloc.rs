@@ -138,7 +138,7 @@ mod tests {
 		raw_range(4194304..16777216, 16);
 	}
 
-	#[test]
+	#[test] #[ignore]
 	fn raw_huge() {
 		raw_range(4194304..268435456, 4);
 	}
