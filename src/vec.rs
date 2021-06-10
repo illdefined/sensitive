@@ -85,11 +85,11 @@ impl<T> Vec<T> {
 	}
 
 	pub fn as_ptr(&self) -> *const T {
-		unsafe { self.inner().as_ptr() }
+		unsafe { self.inner() }.as_ptr()
 	}
 
 	pub fn as_mut_ptr(&mut self) -> *mut T {
-		unsafe { self.inner_mut().as_mut_ptr() }
+		unsafe { self.inner_mut() }.as_mut_ptr()
 	}
 }
 

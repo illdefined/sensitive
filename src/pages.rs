@@ -100,7 +100,8 @@ impl<'t> Pages<'t> {
 		Self::from_raw_parts(NonNull::new(ptr.cast::<u8>()).unwrap(), size)
 	}
 
-	pub unsafe fn as_ptr<T>(&self) -> *mut T {
+	pub fn as_ptr<T>(&self) -> *mut T {
+		debug_assert!(std::mem::align_of::<T>() < Self::granularity());
 		self.0.as_ptr().cast::<T>()
 	}
 
@@ -185,9 +186,8 @@ impl<'t> Pages<'t> {
 
 	pub fn pages(&'t self, range: Range<usize>) -> Option<Pages<'t>> {
 		if range.start < self.len() && range.end <= self.len() {
-			let ptr = unsafe { self.as_ptr::<u8>() };
 			Some(unsafe {
-				Self::from_ptr(ptr.add(range.start * Self::granularity()),
+				Self::from_ptr(self.as_ptr::<u8>().add(range.start * Self::granularity()),
 				(range.end - range.start - 1) * Self::granularity())
 			})
 		} else {
@@ -229,12 +229,13 @@ impl Allocation {
 		Self::from_raw_parts(NonNull::new(ptr.cast::<u8>()).unwrap(), size)
 	}
 
-	pub unsafe fn as_ptr<T>(&self) -> *mut T {
+	pub fn as_ptr<T>(&self) -> *mut T {
+		debug_assert!(std::mem::align_of::<T>() < Self::granularity());
 		self.0.as_ptr().cast::<T>()
 	}
 
 	pub fn into_ptr<T>(self) -> *mut T {
-		unsafe { ManuallyDrop::new(self).as_ptr() }
+		ManuallyDrop::new(self).as_ptr()
 	}
 
 	pub fn into_slice(self) -> NonNull<[u8]> {
@@ -311,9 +312,8 @@ impl Allocation {
 
 	pub fn pages(&self, range: Range<usize>) -> Option<Pages> {
 		if range.start < self.len() && range.end <= self.len() {
-			let ptr = unsafe { self.as_ptr::<u8>() };
 			Some(unsafe {
-				Pages::from_ptr(ptr.add(range.start * Pages::granularity()),
+				Pages::from_ptr(self.as_ptr::<u8>().add(range.start * Pages::granularity()),
 				(range.end - range.start) * Pages::granularity())
 			})
 		} else {
@@ -519,7 +519,7 @@ mod tests {
 		let size = Allocation::granularity();
 		let bp = unsafe { Bulletproof::new() };
 		let alloc = Allocation::new(size, Protection::NoAccess).unwrap();
-		let ptr = unsafe { alloc.as_ptr::<u8>() };
+		let ptr = alloc.as_ptr::<u8>();
 
 		for i in 0..size {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
@@ -552,7 +552,7 @@ mod tests {
 		let alloc_0 = Allocation::new(size_0, Protection::ReadWrite).unwrap();
 		assert_eq!(alloc_0.size(), size_0);
 
-		let ptr = unsafe { alloc_0.as_ptr::<u8>() };
+		let ptr = alloc_0.as_ptr::<u8>();
 
 		for i in 0..size_0 {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
@@ -636,7 +636,7 @@ mod tests {
 		let size = Allocation::granularity();
 		let bp = unsafe { Bulletproof::new() };
 		let alloc = GuardedAlloc::<1>::new(size, Protection::ReadWrite).unwrap();
-		let ptr = unsafe { alloc.inner().as_ptr::<u8>() };
+		let ptr = alloc.inner().as_ptr::<u8>();
 
 		// Preceding guard
 		for i in 1 ..= GuardedAlloc::<1>::guard_size() {
@@ -665,7 +665,7 @@ mod tests {
 
 		let bp = unsafe { Bulletproof::new() };
 		let alloc_0 = GuardedAlloc::<1>::new(size_0, Protection::ReadWrite).unwrap();
-		let ptr = unsafe { alloc_0.inner().as_ptr::<u8>() };
+		let ptr = alloc_0.inner().as_ptr::<u8>();
 
 		for i in 0..size_0 {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
@@ -680,7 +680,7 @@ mod tests {
 		let alloc_1 = alloc_0.shrink(size_1).unwrap();
 
 		// Allocation should not move
-		assert_eq!(unsafe { alloc_1.inner().as_ptr::<u8>() }, ptr);
+		assert_eq!(alloc_1.inner().as_ptr::<u8>(), ptr);
 
 		for i in 0 .. size_1 {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
