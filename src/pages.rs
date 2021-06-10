@@ -457,9 +457,58 @@ mod tests {
 		assert_eq!(Pages::align(Allocation::granularity()), Allocation::granularity());
 	}
 
+	fn raw_range(range: std::ops::Range<usize>, samples: usize) {
+		use rand::distributions::{Distribution, Uniform};
+
+		let mut rng = rand::thread_rng();
+		let dist = Uniform::from(range);
+
+		for _ in 0..samples {
+			let size = dist.sample(&mut rng);
+
+			eprintln!("Allocating {} bytes", size);
+
+			let alloc = Allocation::new(size, Protection::ReadWrite).unwrap();
+
+			assert!(alloc.size() >= size);
+
+			for i in 0..alloc.size() {
+				let ptr = unsafe { alloc.as_ptr::<u8>().add(i) };
+				assert_eq!(unsafe { ptr.read() }, 0);
+				unsafe { ptr.write(0x55) };
+				assert_eq!(unsafe { ptr.read() }, 0x55);
+			}
+		}
+	}
+
+	#[test]
+	fn raw_tiny() {
+		raw_range(1..4096, 4095);
+	}
+
+	#[test]
+	fn raw_small() {
+		raw_range(4096..65536, 256);
+	}
+
+	#[test]
+	fn raw_medium() {
+		raw_range(65536..4194304, 64);
+	}
+
+	#[test]
+	fn raw_large() {
+		raw_range(4194304..16777216, 16);
+	}
+
+	#[test]
+	fn raw_huge() {
+		raw_range(4194304..268435456, 4);
+	}
+
 	#[cfg(target_os = "linux")]
 	#[test]
-	fn protection() {
+	fn raw_protection() {
 		use bulletproof::Bulletproof;
 
 		let size = Allocation::granularity();
@@ -490,7 +539,7 @@ mod tests {
 
 	#[cfg(target_os = "linux")]
 	#[test]
-	fn shrink() {
+	fn raw_shrink() {
 		use bulletproof::Bulletproof;
 
 		let size_0 = std::cmp::max(Allocation::granularity(), 2 * Pages::granularity());
@@ -507,6 +556,7 @@ mod tests {
 		}
 
 		let size_1 = size_0 - Pages::granularity();
+
 		let alloc_1 = alloc_0.shrink(size_1).unwrap();
 		assert_eq!(alloc_1.size(), size_1);
 
@@ -514,7 +564,120 @@ mod tests {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0x55));
 		}
 
-		for i in size_1 + 1 .. size_0 {
+		for i in size_1 .. size_0 {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
+		}
+	}
+
+	fn guarded_range(range: std::ops::Range<usize>, samples: usize) {
+		use rand::distributions::{Distribution, Uniform};
+
+		let mut rng = rand::thread_rng();
+		let dist = Uniform::from(range);
+
+		for _ in 0..samples {
+			let size = dist.sample(&mut rng);
+
+			eprintln!("Allocating {} bytes", size);
+
+			let alloc = GuardedAlloc::<1>::new(size, Protection::ReadWrite).unwrap();
+
+			assert!(alloc.inner().size() >= size);
+
+			for i in 0..alloc.inner().size() {
+				let ptr = unsafe { alloc.inner().as_ptr::<u8>().add(i) };
+				assert_eq!(unsafe { ptr.read() }, 0);
+				unsafe { ptr.write(0x55) };
+				assert_eq!(unsafe { ptr.read() }, 0x55);
+			}
+		}
+	}
+
+	#[test]
+	fn guarded_tiny() {
+		guarded_range(0..4096, 4096);
+	}
+
+	#[test]
+	fn guarded_small() {
+		guarded_range(4096..65536, 256);
+	}
+
+	#[test]
+	fn guarded_medium() {
+		guarded_range(65536..4194304, 64);
+	}
+
+	#[test]
+	fn guarded_large() {
+		guarded_range(4194304..16777216, 16);
+	}
+
+	#[test]
+	fn guarded_huge() {
+		guarded_range(4194304..268435456, 4);
+	}
+
+	#[cfg(target_os = "linux")]
+	#[test]
+	fn guarded_guard() {
+		use bulletproof::Bulletproof;
+
+		let size = Allocation::granularity();
+		let bp = unsafe { Bulletproof::new() };
+		let alloc = GuardedAlloc::<1>::new(size, Protection::ReadWrite).unwrap();
+		let ptr = unsafe { alloc.inner().as_ptr::<u8>() };
+
+		// Preceding guard
+		for i in 1 ..= GuardedAlloc::<1>::guard_size() {
+			assert_eq!(unsafe { bp.load(ptr.sub(i)) }, Err(()));
+		}
+
+		for i in 0 .. size {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
+			assert_eq!(unsafe { bp.store(ptr.add(i), &0x55) }, Ok(()));
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0x55));
+		}
+
+		// Trailing guard
+		for i in size .. GuardedAlloc::<1>::guard_size() {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
+		}
+	}
+
+	#[cfg(target_os = "linux")]
+	#[test]
+	fn guarded_shrink() {
+		use crate::pages::Allocation;
+		use bulletproof::Bulletproof;
+
+		let size_0 = std::cmp::max(Allocation::granularity(), 2 * GuardedAlloc::<1>::guard_size());
+
+		let bp = unsafe { Bulletproof::new() };
+		let alloc_0 = GuardedAlloc::<1>::new(size_0, Protection::ReadWrite).unwrap();
+		let ptr = unsafe { alloc_0.inner().as_ptr::<u8>() };
+
+		for i in 0..size_0 {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
+		}
+
+		// Original guard
+		for i in size_0 .. GuardedAlloc::<1>::guard_size() {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
+		}
+
+		let size_1 = size_0 - GuardedAlloc::<1>::guard_size();
+		let alloc_1 = alloc_0.shrink(size_1).unwrap();
+
+		// Allocation should not move
+		assert_eq!(unsafe { alloc_1.inner().as_ptr::<u8>() }, ptr);
+
+		for i in 0 .. size_1 {
+			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
+		}
+
+		// New guard
+		for i in size_1 + 1 .. GuardedAlloc::<1>::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 	}
