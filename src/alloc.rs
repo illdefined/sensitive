@@ -102,7 +102,7 @@ mod tests {
 			let layout = Layout::from_size_align(size, 1).unwrap();
 			let alloc = Sensitive.allocate(layout).unwrap();
 
-			for i in 0..size / 2 {
+			for i in 0..size {
 				let ptr = unsafe { alloc.cast::<u8>().as_ptr().add(i) };
 				assert_eq!(unsafe { ptr.read() }, 0);
 				unsafe { ptr.write(0x55) };
@@ -186,7 +186,7 @@ mod tests {
 		}
 
 		// Original guard
-		for i in size_0 + 1 .. GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::guard_size() {
+		for i in size_0 .. GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 
@@ -205,7 +205,7 @@ mod tests {
 		}
 
 		// New guard
-		for i in size_1 + 1 .. GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::guard_size() {
+		for i in size_1 .. GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 

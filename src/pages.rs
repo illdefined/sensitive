@@ -677,7 +677,7 @@ mod tests {
 		}
 
 		// New guard
-		for i in size_1 + 1 .. GuardedAlloc::<1>::guard_size() {
+		for i in size_1 .. GuardedAlloc::<1>::guard_size() {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Err(()));
 		}
 	}
