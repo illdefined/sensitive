@@ -223,3 +223,147 @@ impl<T: Protectable + fmt::Debug> fmt::Debug for RefMut<'_, T> {
 		fmt.debug_tuple("RefMut").field(&self.0).finish()
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::io::Error;
+
+	struct Dummy;
+
+	impl Protectable for Dummy {
+		fn lock(&self) -> Result<(), Error> {
+			Ok(())
+		}
+
+		fn unlock(&self) -> Result<(), Error> {
+			Ok(())
+		}
+
+		fn unlock_mut(&mut self) -> Result<(), Error> {
+			Ok(())
+		}
+	}
+
+	#[test]
+	fn underflow() {
+		use std::thread;
+
+		let thr = thread::spawn(move || {
+			let guard = Guard::from_inner(Dummy);
+			guard.release();
+		});
+
+		assert!(thr.join().is_err());
+	}
+
+	#[test]
+	fn overflow() {
+		use std::thread;
+
+		let thr = thread::spawn(move || {
+			let guard = Guard(AtomicUsize::new(Guard::<Dummy>::MAX), Dummy);
+			guard.acquire();
+		});
+
+		assert!(thr.join().is_err());
+	}
+
+	#[test]
+	fn immutable() {
+		let guard = Guard::from_inner(Dummy);
+
+		for _ in 0..1024 {
+			guard.acquire();
+		}
+
+		for _ in 0..1024 {
+			guard.release();
+		}
+	}
+
+	#[test]
+	fn mutable() {
+		let mut guard = Guard::from_inner(Dummy);
+
+		for _ in 0..1024 {
+			guard.acquire_mut();
+			guard.release_mut();
+		}
+	}
+
+	#[test]
+	fn mutable_multiple() {
+		use std::thread;
+
+		let thr = thread::spawn(move || {
+			let mut guard = Guard::from_inner(Dummy);
+			guard.acquire_mut();
+			guard.acquire_mut();
+		});
+
+		assert!(thr.join().is_err());
+	}
+
+	#[test]
+	fn borrow() {
+		const LIMIT: usize = 1024;
+
+		let guard = Guard::from_inner(Dummy);
+
+		{
+			let mut refs = std::vec::Vec::with_capacity(LIMIT);
+
+			for _ in 0..LIMIT {
+				refs.push(guard.borrow());
+			}
+		}
+
+		assert_eq!(guard.0.into_inner(), 0);
+	}
+
+	#[test]
+	fn borrow_mut() {
+		let mut guard = Guard::from_inner(Dummy);
+
+		{
+			guard.borrow_mut();
+		}
+
+		assert_eq!(guard.0.into_inner(), 0);
+	}
+
+	#[test]
+	fn concurrent() {
+		use std::cmp::max;
+		use std::sync::{Arc, Barrier};
+		use std::thread;
+
+		const LIMIT: usize = 262144;
+
+		let guard = Arc::new(Guard::from_inner(Dummy));
+		let concurrency = max(16, 2 * thread::available_concurrency().unwrap().get());
+		let barrier = Arc::new(Barrier::new(concurrency));
+		let mut threads = std::vec::Vec::with_capacity(concurrency);
+
+		for _ in 0..concurrency {
+			let barrier = barrier.clone();
+			let guard = guard.clone();
+
+			threads.push(thread::spawn(move || {
+				barrier.wait();
+
+				for _ in 0..LIMIT {
+					guard.borrow();
+					thread::yield_now();
+				}
+			}));
+		}
+
+		for thread in threads {
+			thread.join().unwrap();
+		}
+
+		assert_eq!(Arc::try_unwrap(guard).unwrap().0.into_inner(), 0);
+	}
+}
