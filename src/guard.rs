@@ -263,27 +263,17 @@ mod tests {
 	}
 
 	#[test]
+	#[should_panic]
 	fn underflow() {
-		use std::thread;
-
-		let thr = thread::spawn(move || {
-			let guard = Guard::from_inner(Dummy);
-			guard.release();
-		});
-
-		assert!(thr.join().is_err());
+		let guard = Guard::from_inner(Dummy);
+		guard.release();
 	}
 
 	#[test]
+	#[should_panic]
 	fn overflow() {
-		use std::thread;
-
-		let thr = thread::spawn(move || {
-			let guard = Guard(AtomicUsize::new(Guard::<Dummy>::MAX), Dummy);
-			guard.acquire();
-		});
-
-		assert!(thr.join().is_err());
+		let guard = Guard(AtomicUsize::new(Guard::<Dummy>::MAX), Dummy);
+		guard.acquire();
 	}
 
 	#[test]
@@ -310,16 +300,11 @@ mod tests {
 	}
 
 	#[test]
+	#[should_panic]
 	fn mutable_multiple() {
-		use std::thread;
-
-		let thr = thread::spawn(move || {
-			let mut guard = Guard::from_inner(Dummy);
-			guard.acquire_mut();
-			guard.acquire_mut();
-		});
-
-		assert!(thr.join().is_err());
+		let mut guard = Guard::from_inner(Dummy);
+		guard.acquire_mut();
+		guard.acquire_mut();
 	}
 
 	#[test]
