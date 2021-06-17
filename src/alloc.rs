@@ -4,6 +4,7 @@ use crate::auxiliary::zero;
 use crate::pages::{Pages, GuardedAlloc, Protection};
 
 use std::alloc::{Allocator, AllocError, Layout, handle_alloc_error};
+use std::intrinsics::{likely, unlikely};
 use std::ptr::NonNull;
 
 /// Allocator for sensitive information
@@ -17,13 +18,13 @@ impl Sensitive {
 unsafe impl Allocator for Sensitive {
 	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
 		// Refuse allocation if alignment requirement exceeds page size
-		if layout.align() >= Pages::granularity() {
+		if unlikely(layout.align() >= Pages::granularity()) {
 			return Err(AllocError);
 		}
 
 		let alloc = GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::new(layout.size(), Protection::ReadWrite).map_err(|_| AllocError)?;
 
-		if !alloc.inner().is_empty() {
+		if likely(!alloc.inner().is_empty()) {
 			// Attempt to lock memory
 			let _ = alloc.inner().lock();
 		}
@@ -40,9 +41,9 @@ unsafe impl Allocator for Sensitive {
 
 		let alloc = GuardedAlloc::<{ Self::GUARD_PAGES }>::from_raw_parts(ptr, layout.size());
 
-		if !alloc.inner().is_empty() {
+		if likely(!alloc.inner().is_empty()) {
 			// Allow read‐write access before zeroing
-			if alloc.inner().protect(Protection::ReadWrite).is_err() {
+			if unlikely(alloc.inner().protect(Protection::ReadWrite).is_err()) {
 				handle_alloc_error(layout);
 			}
 
@@ -53,7 +54,7 @@ unsafe impl Allocator for Sensitive {
 
 	unsafe fn shrink(&self, ptr: NonNull<u8>, old: Layout, new: Layout) -> Result<NonNull<[u8]>, AllocError> {
 		// Refuse allocation if alignment requirement exceeds page size
-		if new.align() >= Pages::granularity() {
+		if unlikely(new.align() >= Pages::granularity()) {
 			return Err(AllocError);
 		}
 
@@ -69,8 +70,8 @@ unsafe impl Allocator for Sensitive {
 			let diff = inner_old - inner_new;
 
 			// Allow read‐write access before zeroing
-			if Pages::from_ptr(tail, diff + GuardedAlloc::<{ Self::GUARD_PAGES }>::guard_size())
-			.protect(Protection::ReadWrite).is_err() {
+			if unlikely(Pages::from_ptr(tail, diff + GuardedAlloc::<{ Self::GUARD_PAGES }>::guard_size())
+			            .protect(Protection::ReadWrite).is_err()) {
 				handle_alloc_error(new);
 			}
 

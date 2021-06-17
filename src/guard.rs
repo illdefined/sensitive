@@ -2,6 +2,7 @@
 
 use crate::traits::Protectable;
 
+use std::intrinsics::likely;
 use std::fmt;
 use std::ops::{Deref, DerefMut, Index, IndexMut, Drop};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -65,7 +66,7 @@ impl<T: Protectable> Guard<T> {
 			Some(refs - 1)
 		}).unwrap() & Self::REF == 1 {  // Last release?
 		self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire,
-		|refs| if refs == 1 {
+		|refs| if likely(refs == 1) {
 				// Last release
 				self.1.lock().unwrap();
 

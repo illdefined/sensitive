@@ -4,6 +4,7 @@ use crate::auxiliary::align;
 use crate::traits::{AsPages, Protectable};
 
 use std::convert::TryInto;
+use std::intrinsics::{likely, unlikely};
 use std::io::Error;
 use std::marker::PhantomData;
 use std::mem::{MaybeUninit, ManuallyDrop};
@@ -220,7 +221,7 @@ impl<'t> Pages<'t> {
 	}
 
 	pub fn pages(&'t self, range: Range<usize>) -> Option<Pages<'t>> {
-		if range.start < self.len() && range.end <= self.len() {
+		if likely(range.start < self.len() && range.end <= self.len()) {
 			Some(unsafe {
 				Self::from_ptr(self.as_ptr::<u8>().add(range.start * Self::granularity()),
 				(range.end - range.start - 1) * Self::granularity())
@@ -364,7 +365,7 @@ impl Allocation {
 	}
 
 	pub fn pages(&self, range: Range<usize>) -> Option<Pages> {
-		if range.start < self.len() && range.end <= self.len() {
+		if likely(range.start < self.len() && range.end <= self.len()) {
 			Some(unsafe {
 				Pages::from_ptr(self.as_ptr::<u8>().add(range.start * Pages::granularity()),
 				(range.end - range.start) * Pages::granularity())
@@ -380,7 +381,7 @@ impl Drop for Allocation {
 		#[cfg(unix)] {
 			use libc::munmap;
 
-			if unsafe { munmap(self.as_ptr::<c_void>(), self.0.len()) } != 0 {
+			if unlikely(unsafe { munmap(self.as_ptr::<c_void>(), self.0.len()) } != 0) {
 				panic!("{}", Error::last_os_error());
 			}
 		}
@@ -389,7 +390,7 @@ impl Drop for Allocation {
 			use winapi::um::memoryapi::VirtualFree;
 			use winapi::um::winnt::MEM_RELEASE;
 
-			if unsafe { VirtualFree(self.as_ptr::<c_void>(), 0, MEM_RELEASE) } == 0 {
+			if unlikely(unsafe { VirtualFree(self.as_ptr::<c_void>(), 0, MEM_RELEASE) } == 0) {
 				panic!("{}", Error::last_os_error());
 			}
 		}
@@ -414,7 +415,7 @@ impl<const N: usize> GuardedAlloc<N> {
 	pub fn new(size: usize, prot: Protection) -> Result<Self, Error> {
 		let alloc = Self(Allocation::new(Self::outer_size(size), Protection::NoAccess)?);
 
-		if !alloc.inner().is_empty() {
+		if likely(!alloc.inner().is_empty()) {
 			alloc.inner().protect(prot)?;
 		}
 
