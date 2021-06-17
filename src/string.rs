@@ -41,38 +41,47 @@ impl String {
 		}
 	}
 
+	#[inline]
 	pub fn new() -> Self {
 		Self(Vec::new())
 	}
 
+	#[inline]
 	pub fn with_capacity(capacity: usize) -> Self {
 		Self(Vec::with_capacity(capacity))
 	}
 
+	#[inline]
 	pub fn capacity(&self) -> usize {
 		self.0.capacity()
 	}
 
+	#[inline]
 	pub fn len(&self) -> usize {
 		self.0.len()
 	}
 
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.0.is_empty()
 	}
 
+	#[inline]
 	pub fn reserve(&mut self, capacity: usize) {
 		self.0.reserve(capacity);
 	}
 
+	#[inline]
 	pub fn reserve_exact(&mut self, capacity: usize) {
 		self.0.reserve_exact(capacity);
 	}
 
+	#[inline]
 	pub fn borrow(&self) -> Ref<'_> {
 		Ref(self.0.borrow())
 	}
 
+	#[inline]
 	pub fn borrow_mut(&mut self) -> RefMut<'_> {
 		RefMut(self.0.borrow_mut())
 	}
@@ -129,48 +138,58 @@ impl From<std::string::String> for String {
 }
 
 impl Ref<'_> {
+	#[inline]
 	pub fn as_bytes(&self) -> &[u8] {
 		self.0.as_slice()
 	}
 
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe { std::str::from_utf8_unchecked(self.0.as_slice()) }
 	}
 
+	#[inline]
 	pub fn chars(&self) -> Chars<'_> {
 		self.as_str().chars()
 	}
 }
 
 impl PartialEq<Self> for Ref<'_> {
+	#[inline]
 	fn eq(&self, other: &Self) -> bool {
 		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}
 }
 
 impl PartialEq<RefMut<'_>> for Ref<'_> {
+	#[inline]
 	fn eq(&self, other: &RefMut<'_>) -> bool {
 		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}
 }
 
 impl RefMut<'_> {
+	#[inline]
 	pub fn as_bytes(&self) -> &[u8] {
 		self.0.as_slice()
 	}
 
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe { std::str::from_utf8_unchecked(self.0.as_slice()) }
 	}
 
+	#[inline]
 	pub fn chars(&self) -> Chars<'_> {
 		self.as_str().chars()
 	}
 
+	#[inline]
 	pub fn reserve(&mut self, capacity: usize) {
 		self.0.reserve(capacity);
 	}
 
+	#[inline]
 	pub fn reserve_exact(&mut self, capacity: usize) {
 		self.0.reserve_exact(capacity);
 	}
@@ -205,12 +224,14 @@ impl RefMut<'_> {
 }
 
 impl PartialEq<Self> for RefMut<'_> {
+	#[inline]
 	fn eq(&self, other: &Self) -> bool {
 		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}
 }
 
 impl PartialEq<Ref<'_>> for RefMut<'_> {
+	#[inline]
 	fn eq(&self, other: &Ref<'_>) -> bool {
 		String::eq_slice(unsafe { self.0.0.inner() }, unsafe { other.0.0.inner() })
 	}

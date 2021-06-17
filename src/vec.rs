@@ -58,6 +58,7 @@ impl<T> Vec<T> {
 		guard
 	}
 
+	#[inline]
 	pub fn capacity(&self) -> usize {
 		unsafe { self.inner().capacity() }
 	}
@@ -76,28 +77,34 @@ impl<T> Vec<T> {
 		});
 	}
 
+	#[inline]
 	pub fn len(&self) -> usize {
 		unsafe { self.inner().len() }
 	}
 
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		unsafe { self.inner().is_empty() }
 	}
 
+	#[inline]
 	pub unsafe fn set_len(&mut self, len: usize) {
 		self.inner_mut().set_len(len);
 	}
 
+	#[inline]
 	pub fn as_ptr(&self) -> *const T {
 		unsafe { self.inner() }.as_ptr()
 	}
 
+	#[inline]
 	pub fn as_mut_ptr(&mut self) -> *mut T {
 		unsafe { self.inner_mut() }.as_mut_ptr()
 	}
 }
 
 impl<T> Default for Vec<T> {
+	#[inline]
 	fn default() -> Self {
 		Self::new()
 	}
@@ -162,103 +169,123 @@ impl PartialEq<&str> for Vec<u8> {
 }
 
 impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<[U]> for Ref<'_, InnerVec<T>> {
+	#[inline]
 	fn eq(&self, other: &[U]) -> bool {
 		Vec::<T>::eq_slice(self.0, other)
 	}
 }
 
 impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<&[U]> for Ref<'_, InnerVec<T>> {
+	#[inline]
 	fn eq(&self, other: &&[U]) -> bool {
 		self == *other
 	}
 }
 
 impl<T> Ref<'_, InnerVec<T>> {
+	#[inline]
 	pub fn as_slice(&self) -> &[T] {
 		unsafe { self.0.inner() }.as_slice()
 	}
 }
 
 impl<T: Copy + Into<usize>, U: Copy + Into<usize>, const N: usize> PartialEq<[U; N]> for Ref<'_, InnerVec<T>> {
+	#[inline]
 	fn eq(&self, other: &[U; N]) -> bool {
 		self == other as &[U]
 	}
 }
 
 impl PartialEq<&str> for Ref<'_, InnerVec<u8>> {
+	#[inline]
 	fn eq(&self, other: &&str) -> bool {
 		self == other.as_bytes()
 	}
 }
 
 impl<T> RefMut<'_, InnerVec<T>> {
+	#[inline]
 	pub fn as_slice(&self) -> &[T] {
 		unsafe { self.0.inner() }.as_slice()
 	}
 
+	#[inline]
 	pub fn len(&self) -> usize {
 		unsafe { self.0.inner() }.len()
 	}
 
+	#[inline]
 	pub fn push(&mut self, value: T) {
 		self.inner_mut().push(value);
 	}
 
+	#[inline]
 	pub fn pop(&mut self) -> Option<T> {
 		self.inner_mut().pop()
 	}
 
+	#[inline]
 	pub fn shrink_to_fit(&mut self) {
 		self.inner_mut().shrink_to_fit();
 	}
 
+	#[inline]
 	pub fn extend<I>(&mut self, iter: I)
 		where I: IntoIterator<Item = T> {
 		self.inner_mut().extend(iter);
 	}
 
+	#[inline]
 	pub fn spare_capacity_mut(&mut self) -> &mut [MaybeUninit<T>] {
 		self.inner_mut().spare_capacity_mut()
 	}
 
+	#[inline]
 	pub fn reserve(&mut self, capacity: usize) {
 		self.inner_mut().reserve(capacity);
 	}
 
+	#[inline]
 	pub fn reserve_exact(&mut self, capacity: usize) {
 		self.inner_mut().reserve_exact(capacity);
 	}
 
+	#[inline]
 	pub unsafe fn set_len(&mut self, len: usize) {
 		self.inner_mut().set_len(len);
 	}
 }
 
 impl<T: Clone> RefMut<'_, InnerVec<T>> {
+	#[inline]
 	pub fn resize(&mut self, len: usize, value: T) {
 		self.inner_mut().resize(len, value);
 	}
 }
 
 impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<[U]> for RefMut<'_, InnerVec<T>> {
+	#[inline]
 	fn eq(&self, other: &[U]) -> bool {
 		Vec::<T>::eq_slice(self.0, other)
 	}
 }
 
 impl<T: Copy + Into<usize>, U: Copy + Into<usize>> PartialEq<&[U]> for RefMut<'_, InnerVec<T>> {
+	#[inline]
 	fn eq(&self, other: &&[U]) -> bool {
 		self == *other
 	}
 }
 
 impl<T: Copy + Into<usize>, U: Copy + Into<usize>, const N: usize> PartialEq<[U; N]> for RefMut<'_, InnerVec<T>> {
+	#[inline]
 	fn eq(&self, other: &[U; N]) -> bool {
 		self == other as &[U]
 	}
 }
 
 impl PartialEq<&str> for RefMut<'_, InnerVec<u8>> {
+	#[inline]
 	fn eq(&self, other: &&str) -> bool {
 		self == other.as_bytes()
 	}

@@ -141,10 +141,12 @@ impl<'t> Pages<'t> {
 		self.0.as_ptr().cast::<T>()
 	}
 
+	#[inline]
 	pub fn into_slice(self) -> NonNull<[u8]> {
 		self.0
 	}
 
+	#[inline]
 	pub fn size(&self) -> usize {
 		self.0.len()
 	}
@@ -153,6 +155,7 @@ impl<'t> Pages<'t> {
 		self.size() / Self::granularity()
 	}
 
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.size() == 0
 	}
@@ -288,14 +291,17 @@ impl Allocation {
 		self.0.as_ptr().cast::<T>()
 	}
 
+	#[inline]
 	pub fn into_ptr<T>(self) -> *mut T {
 		ManuallyDrop::new(self).as_ptr()
 	}
 
+	#[inline]
 	pub fn into_slice(self) -> NonNull<[u8]> {
 		ManuallyDrop::new(self).0
 	}
 
+	#[inline]
 	pub fn size(&self) -> usize {
 		self.0.len()
 	}
@@ -304,6 +310,7 @@ impl Allocation {
 		self.size() / Pages::granularity()
 	}
 
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.size() == 0
 	}

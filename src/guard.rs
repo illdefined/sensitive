@@ -22,6 +22,7 @@ impl<T: Protectable> Guard<T> {
 	const MUT: usize = usize::MAX & Self::REF;
 	const MAX: usize = (usize::MAX & Self::REF) - 1;
 
+	#[inline]
 	pub fn from_inner(inner: T) -> Self {
 		Self(AtomicUsize::default(), inner)
 	}
@@ -97,10 +98,12 @@ impl<T: Protectable> Guard<T> {
 		self
 	}
 
+	#[inline]
 	pub(crate) unsafe fn inner(&self) -> &T {
 		&self.1
 	}
 
+	#[inline]
 	pub(crate) unsafe fn inner_mut(&mut self) -> &mut T {
 		&mut self.1
 	}
@@ -113,10 +116,12 @@ impl<T: Protectable> Guard<T> {
 		self
 	}
 
+	#[inline]
 	pub fn borrow(&self) -> Ref<'_, T> {
 		Ref(self.acquire())
 	}
 
+	#[inline]
 	pub fn borrow_mut(&mut self) -> RefMut<'_, T> {
 		RefMut(self.acquire_mut())
 	}
@@ -142,6 +147,7 @@ impl<T: Protectable> fmt::Debug for Guard<T> {
 }
 
 impl<T: Protectable> Ref<'_, T> {
+	#[inline]
 	pub fn inner(&self) -> &T {
 		&self.0.1
 	}
@@ -150,6 +156,7 @@ impl<T: Protectable> Ref<'_, T> {
 impl<T: Protectable + Deref> Deref for Ref<'_, T> {
 	type Target = T::Target;
 
+	#[inline]
 	fn deref(&self) -> &Self::Target {
 		&*self.0.1
 	}
@@ -158,12 +165,14 @@ impl<T: Protectable + Deref> Deref for Ref<'_, T> {
 impl<T: Protectable + Index<I>, I> Index<I> for Ref<'_, T> {
 	type Output = T::Output;
 
+	#[inline]
 	fn index(&self, index: I) -> &Self::Output {
 		&self.0.1[index]
 	}
 }
 
 impl<T: Protectable> Drop for Ref<'_, T> {
+	#[inline]
 	fn drop(&mut self) {
 		self.0.release();
 	}
@@ -176,10 +185,12 @@ impl<T: Protectable + fmt::Debug> fmt::Debug for Ref<'_, T> {
 }
 
 impl<T: Protectable> RefMut<'_, T> {
+	#[inline]
 	pub fn inner(&self) -> &T {
 		&self.0.1
 	}
 
+	#[inline]
 	pub fn inner_mut(&mut self) -> &mut T {
 		&mut self.0.1
 	}
@@ -188,6 +199,7 @@ impl<T: Protectable> RefMut<'_, T> {
 impl<T: Protectable + Deref> Deref for RefMut<'_, T> {
 	type Target = T::Target;
 
+	#[inline]
 	fn deref(&self) -> &Self::Target {
 		&*self.0.1
 	}
@@ -196,24 +208,28 @@ impl<T: Protectable + Deref> Deref for RefMut<'_, T> {
 impl<T: Protectable + Index<I>, I> Index<I> for RefMut<'_, T> {
 	type Output = T::Output;
 
+	#[inline]
 	fn index(&self, index: I) -> &Self::Output {
 		&self.0.1[index]
 	}
 }
 
 impl<T: Protectable + Index<I> + IndexMut<I>, I> IndexMut<I> for RefMut<'_, T> {
+	#[inline]
 	fn index_mut(&mut self, index: I) -> &mut Self::Output {
 		&mut self.0.1[index]
 	}
 }
 
 impl<T: Protectable + Deref + DerefMut> DerefMut for RefMut<'_, T> {
+	#[inline]
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut *self.0.1
 	}
 }
 
 impl<T: Protectable> Drop for RefMut<'_, T> {
+	#[inline]
 	fn drop(&mut self) {
 		self.0.release_mut();
 	}

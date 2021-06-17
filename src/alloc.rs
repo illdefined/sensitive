@@ -32,6 +32,7 @@ unsafe impl Allocator for Sensitive {
 		Ok(alloc.into_slice())
 	}
 
+	#[inline]
 	fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
 		self.allocate(layout)
 	}
