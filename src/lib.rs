@@ -1,6 +1,6 @@
 #![feature(
 	allocator_api,
-	available_concurrency,
+	available_parallelism,
 	cell_update,
 	const_generics_defaults,
 	core_intrinsics,

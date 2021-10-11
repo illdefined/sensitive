@@ -406,7 +406,7 @@ mod tests {
 			}
 		}
 
-		let concurrency = max(16, 2 * thread::available_concurrency().unwrap().get());
+		let concurrency = max(16, 2 * thread::available_parallelism().unwrap().get());
 		let barrier = Arc::new(Barrier::new(concurrency));
 		let vec = Arc::new(test);
 		let mut threads = std::vec::Vec::with_capacity(concurrency);
@@ -448,7 +448,7 @@ mod tests {
 			}
 		}
 
-		let concurrency = max(16, 2 * thread::available_concurrency().unwrap().get());
+		let concurrency = max(16, 2 * thread::available_parallelism().unwrap().get());
 		let barrier = Arc::new(Barrier::new(concurrency));
 		let lock = Arc::new(RwLock::new(test));
 		let mut threads = std::vec::Vec::with_capacity(concurrency);

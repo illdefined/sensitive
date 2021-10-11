@@ -344,7 +344,7 @@ mod tests {
 		const LIMIT: usize = 262144;
 
 		let guard = Arc::new(Guard::from_inner(Dummy));
-		let concurrency = max(16, 2 * thread::available_concurrency().unwrap().get());
+		let concurrency = max(16, 2 * thread::available_parallelism().unwrap().get());
 		let barrier = Arc::new(Barrier::new(concurrency));
 		let mut threads = std::vec::Vec::with_capacity(concurrency);
 
