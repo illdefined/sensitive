@@ -2,7 +2,6 @@
 	allocator_api,
 	available_parallelism,
 	cell_update,
-	const_generics_defaults,
 	core_intrinsics,
 	maybe_uninit_extra,
 	maybe_uninit_slice,
