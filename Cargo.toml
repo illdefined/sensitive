@@ -24,6 +24,7 @@ winapi = { version = "0.3", features = [ "memoryapi", "sysinfoapi", "winnt" ] }
 
 [dev-dependencies]
 rand = "0.8"
+rand_xoshiro = "0.6"
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 bulletproof = "0.2"

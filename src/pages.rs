@@ -531,9 +531,10 @@ mod tests {
 	}
 
 	fn raw_range(range: std::ops::Range<usize>, samples: usize) {
+		use rand::SeedableRng;
 		use rand::distributions::{Distribution, Uniform};
 
-		let mut rng = rand::thread_rng();
+		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_entropy();
 		let dist = Uniform::from(range);
 
 		for _ in 0..samples {
@@ -579,7 +580,7 @@ mod tests {
 		raw_range(4194304..16777216, 16);
 	}
 
-	#[test] #[ignore]
+	#[test]
 	fn raw_huge() {
 		raw_range(4194304..268435456, 4);
 	}
@@ -648,9 +649,10 @@ mod tests {
 	}
 
 	fn guarded_range(range: std::ops::Range<usize>, samples: usize) {
+		use rand::SeedableRng;
 		use rand::distributions::{Distribution, Uniform};
 
-		let mut rng = rand::thread_rng();
+		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_entropy();
 		let dist = Uniform::from(range);
 
 		for _ in 0..samples {
@@ -696,7 +698,7 @@ mod tests {
 		guarded_range(4194304..16777216, 16);
 	}
 
-	#[test] #[ignore]
+	#[test]
 	fn guarded_huge() {
 		guarded_range(4194304..268435456, 4);
 	}
