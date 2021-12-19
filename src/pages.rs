@@ -171,6 +171,7 @@ impl<'t> Pages<'t> {
 		self.size() == 0
 	}
 
+	#[allow(clippy::missing_errors_doc)]
 	pub fn protect(&self, prot: Protection) -> Result<(), Error> {
 		#[cfg(unix)] {
 			use libc::mprotect;
@@ -194,6 +195,7 @@ impl<'t> Pages<'t> {
 		}
 	}
 
+	#[allow(clippy::missing_errors_doc)]
 	pub fn lock(&self) -> Result<(), Error> {
 		#[cfg(unix)] {
 			use libc::mlock;
@@ -214,6 +216,7 @@ impl<'t> Pages<'t> {
 		}
 	}
 
+	#[allow(clippy::missing_errors_doc)]
 	pub fn unlock(&self) -> Result<(), Error> {
 		#[cfg(unix)] {
 			use libc::munlock;
@@ -335,6 +338,7 @@ impl Allocation {
 		self.size() == 0
 	}
 
+	#[allow(clippy::missing_errors_doc)]
 	pub fn new(size: usize, prot: Protection) -> Result<Self, Error> {
 		let size = Self::align(size);
 
@@ -364,6 +368,7 @@ impl Allocation {
 	/// # Panics
 	///
 	/// May panic if `size` is not smaller than the current size.
+	#[allow(clippy::missing_errors_doc)]
 	pub fn shrink(self, size: usize) -> Result<Self, Error> {
 		assert!(size < self.0.len());
 
@@ -446,6 +451,7 @@ impl<const N: usize> GuardedAlloc<N> {
 		Self::outer_size(size) - 2 * Self::guard_size()
 	}
 
+	#[allow(clippy::missing_errors_doc)]
 	pub fn new(size: usize, prot: Protection) -> Result<Self, Error> {
 		let alloc = Self(Allocation::new(Self::outer_size(size), Protection::NoAccess)?);
 
@@ -503,7 +509,7 @@ impl<const N: usize> GuardedAlloc<N> {
 		unsafe { Pages::from_slice(self.into_slice()) }
 	}
 
-	#[allow(clippy::missing_panics_doc)]
+	#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 	pub fn shrink(self, size: usize) -> Result<Self, Error> {
 		let outer = Self::outer_size(size);
 
