@@ -4,7 +4,7 @@ use crate::auxiliary::align;
 use crate::traits::{AsPages, Protectable};
 
 use std::convert::TryInto;
-use std::intrinsics::{likely, unlikely};
+use std::intrinsics::likely;
 use std::io::Error;
 use std::marker::PhantomData;
 use std::mem::{MaybeUninit, ManuallyDrop};
@@ -417,18 +417,16 @@ impl Drop for Allocation {
 		#[cfg(unix)] {
 			use libc::munmap;
 
-			if unlikely(unsafe { munmap(self.as_ptr::<c_void>(), self.0.len()) } != 0) {
-				panic!("{}", Error::last_os_error());
-			}
+			assert_eq!(unsafe { munmap(self.as_ptr::<c_void>(), self.0.len()) }, 0,
+			"{}", Error::last_os_error());
 		}
 
 		#[cfg(windows)] {
 			use winapi::um::memoryapi::VirtualFree;
 			use winapi::um::winnt::MEM_RELEASE;
 
-			if unlikely(unsafe { VirtualFree(self.as_ptr::<c_void>(), 0, MEM_RELEASE) } == 0) {
-				panic!("{}", Error::last_os_error());
-			}
+			assert_ne!(unsafe { VirtualFree(self.as_ptr::<c_void>(), 0, MEM_RELEASE) }, 0,
+			"{}", Error::last_os_error());
 		}
 	}
 }
