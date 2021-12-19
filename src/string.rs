@@ -14,14 +14,17 @@ use unicode_normalization::UnicodeNormalization;
 use unicode_normalization::char::decompose_canonical;
 
 /// Guarded [string](std::string::String) type
+#[must_use]
 #[derive(Debug, Default)]
 pub struct String(Vec<u8>);
 
 /// Reference to immutably borrowed guarded [`String`]
+#[must_use]
 #[derive(Debug)]
 pub struct Ref<'t>(guard::Ref<'t, InnerVec<u8>>);
 
 /// Reference to mutably borrowed guarded [`String`]
+#[must_use]
 #[derive(Debug)]
 pub struct RefMut<'t>(guard::RefMut<'t, InnerVec<u8>>);
 
@@ -138,12 +141,12 @@ impl From<std::string::String> for String {
 }
 
 impl Ref<'_> {
-	#[inline]
+	#[must_use] #[inline]
 	pub fn as_bytes(&self) -> &[u8] {
 		self.0.as_slice()
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe { std::str::from_utf8_unchecked(self.0.as_slice()) }
 	}
@@ -169,12 +172,12 @@ impl PartialEq<RefMut<'_>> for Ref<'_> {
 }
 
 impl RefMut<'_> {
-	#[inline]
+	#[must_use] #[inline]
 	pub fn as_bytes(&self) -> &[u8] {
 		self.0.as_slice()
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe { std::str::from_utf8_unchecked(self.0.as_slice()) }
 	}

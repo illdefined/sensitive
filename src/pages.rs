@@ -51,14 +51,17 @@ pub enum Protection {
 }
 
 /// Memory pages
+#[must_use]
 #[derive(Debug)]
 pub struct Pages<'t>(NonNull<[u8]>, PhantomData<&'t ()>);
 
 /// Memory page allocation
+#[must_use]
 #[derive(Debug)]
 pub struct Allocation(NonNull<[u8]>);
 
 /// Guarded memory page allocation
+#[must_use]
 #[derive(Debug)]
 pub struct GuardedAlloc<const N: usize = 1>(Allocation);
 
@@ -93,12 +96,14 @@ fn init() {
 }
 
 impl<'t> Pages<'t> {
+	#[must_use]
 	pub fn granularity() -> usize {
 		init();
 
 		unsafe { PAGE_SIZE.assume_init() }
 	}
 
+	#[must_use]
 	pub fn align(offset: usize) -> usize {
 		align(offset, Self::granularity())
 	}
@@ -136,26 +141,28 @@ impl<'t> Pages<'t> {
 		Self::from_raw_parts(NonNull::new(ptr.cast::<u8>()).unwrap(), size)
 	}
 
+	#[must_use]
 	pub fn as_ptr<T>(&self) -> *mut T {
 		debug_assert!(std::mem::align_of::<T>() < Self::granularity());
 		self.0.as_ptr().cast::<T>()
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub const fn into_slice(self) -> NonNull<[u8]> {
 		self.0
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn size(&self) -> usize {
 		self.0.len()
 	}
 
+	#[must_use]
 	pub fn len(&self) -> usize {
 		self.size() / Self::granularity()
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn is_empty(&self) -> bool {
 		self.size() == 0
 	}
@@ -223,6 +230,7 @@ impl<'t> Pages<'t> {
 		}
 	}
 
+	#[must_use]
 	pub fn pages(&'t self, range: Range<usize>) -> Option<Pages<'t>> {
 		if likely(range.start < self.len() && range.end <= self.len()) {
 			Some(unsafe {
@@ -236,6 +244,7 @@ impl<'t> Pages<'t> {
 }
 
 impl Allocation {
+	#[must_use]
 	pub fn granularity() -> usize {
 		#[cfg(unix)] {
 			Pages::granularity()
@@ -248,6 +257,7 @@ impl Allocation {
 		}
 	}
 
+	#[must_use]
 	pub fn align(offset: usize) -> usize {
 		align(offset, Self::granularity())
 	}
@@ -286,31 +296,33 @@ impl Allocation {
 		Self::from_raw_parts(NonNull::new(ptr.cast::<u8>()).unwrap(), size)
 	}
 
+	#[must_use]
 	pub fn as_ptr<T>(&self) -> *mut T {
 		debug_assert!(std::mem::align_of::<T>() < Self::granularity());
 		self.0.as_ptr().cast::<T>()
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn into_ptr<T>(self) -> *mut T {
 		ManuallyDrop::new(self).as_ptr()
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn into_slice(self) -> NonNull<[u8]> {
 		ManuallyDrop::new(self).0
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn size(&self) -> usize {
 		self.0.len()
 	}
 
+	#[must_use]
 	pub fn len(&self) -> usize {
 		self.size() / Pages::granularity()
 	}
 
-	#[inline]
+	#[must_use] #[inline]
 	pub fn is_empty(&self) -> bool {
 		self.size() == 0
 	}
@@ -371,6 +383,7 @@ impl Allocation {
 		}
 	}
 
+	#[must_use]
 	pub fn pages(&self, range: Range<usize>) -> Option<Pages> {
 		if likely(range.start < self.len() && range.end <= self.len()) {
 			Some(unsafe {
@@ -407,14 +420,17 @@ impl Drop for Allocation {
 impl<const N: usize> GuardedAlloc<N> {
 	pub const GUARD_PAGES: usize = N;
 
+	#[must_use]
 	pub fn guard_size() -> usize {
 		Self::GUARD_PAGES * Pages::granularity()
 	}
 
+	#[must_use]
 	pub fn outer_size(size: usize) -> usize {
 		Allocation::align(size + 2 * Self::guard_size())
 	}
 
+	#[must_use]
 	pub fn inner_size(size: usize) -> usize {
 		Self::outer_size(size) - 2 * Self::guard_size()
 	}
@@ -461,6 +477,7 @@ impl<const N: usize> GuardedAlloc<N> {
 		Self::from_raw_parts(NonNull::new(base.cast::<u8>()).unwrap(), inner)
 	}
 
+	#[must_use]
 	pub fn into_slice(self) -> NonNull<[u8]> {
 		let len = self.0.len();
 		ManuallyDrop::new(self.0).pages(Self::GUARD_PAGES .. len - Self::GUARD_PAGES).unwrap().into_slice()

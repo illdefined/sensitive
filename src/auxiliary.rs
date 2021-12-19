@@ -1,6 +1,7 @@
 //! Auxiliary functions
 
 /// Check if `num` is a non‐zero power of two
+#[must_use]
 pub const fn is_power_of_two(num: usize) -> bool {
 	num != 0 && (num & (num - 1)) == 0
 }
@@ -8,6 +9,7 @@ pub const fn is_power_of_two(num: usize) -> bool {
 /// Align `offset` to a multiple of `align`
 ///
 /// `align` must be a non‐zero power of two.
+#[must_use]
 pub const fn align(offset: usize, align: usize) -> usize {
 	debug_assert!(is_power_of_two(align));
 

@@ -8,12 +8,15 @@ use std::ops::{Deref, DerefMut, Index, IndexMut, Drop};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Atomically reference‐counted access guard
+#[must_use]
 pub struct Guard<T: Protectable>(AtomicUsize, T);
 
 /// Reference to immutably borrowed guarded value
+#[must_use]
 pub struct Ref<'t, T: Protectable>(pub &'t Guard<T>);
 
 /// Reference to mutably borrowed guarded value
+#[must_use]
 pub struct RefMut<'t, T: Protectable>(pub &'t mut Guard<T>);
 
 impl<T: Protectable> Guard<T> {
