@@ -22,7 +22,7 @@ unsafe impl Allocator for Sensitive {
 			return Err(AllocError);
 		}
 
-		let alloc = GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::new(layout.size(), Protection::ReadWrite).map_err(|_| AllocError)?;
+		let alloc = GuardedAlloc::<{ Self::GUARD_PAGES }>::new(layout.size(), Protection::ReadWrite).map_err(|_| AllocError)?;
 
 		if likely(!alloc.inner().is_empty()) {
 			// Attempt to lock memory
