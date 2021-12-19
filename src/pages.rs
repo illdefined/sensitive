@@ -142,7 +142,7 @@ impl<'t> Pages<'t> {
 	}
 
 	#[inline]
-	pub fn into_slice(self) -> NonNull<[u8]> {
+	pub const fn into_slice(self) -> NonNull<[u8]> {
 		self.0
 	}
 
