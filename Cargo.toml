@@ -1,13 +1,13 @@
 [package]
 name = "sensitive"
 version = "0.9.3"
-authors = [ "Mikael Voss <mvs@nyantec.com>" ]
+authors = ["Mikael Voss <mvs@nyantec.com>"]
 edition = "2021"
 description = "Memory allocator for sensitive information"
 repository = "https://github.com/illdefined/sensitive"
 license = "MirOS"
-keywords = [ "security" ]
-categories = [ "memory-management" ]
+keywords = ["security"]
+categories = ["memory-management"]
 
 [features]
 default = ["string"]
@@ -20,7 +20,7 @@ unicode-normalization = { version = "0.1", optional = true }
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = [ "memoryapi", "sysinfoapi", "winnt" ] }
+winapi = { version = "0.3", features = ["memoryapi", "sysinfoapi", "winnt"] }
 
 [dev-dependencies]
 rand = "0.8"
