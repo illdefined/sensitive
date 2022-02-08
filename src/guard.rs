@@ -332,7 +332,7 @@ mod tests {
 		let mut guard = Guard::from_inner(Dummy);
 
 		{
-			guard.borrow_mut();
+			let mut _ref = guard.borrow_mut();
 		}
 
 		assert_eq!(guard.0.into_inner(), 0);
@@ -359,7 +359,7 @@ mod tests {
 				barrier.wait();
 
 				for _ in 0..LIMIT {
-					guard.borrow();
+					let _ref = guard.borrow();
 					thread::yield_now();
 				}
 			}));
