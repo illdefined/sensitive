@@ -677,6 +677,9 @@ mod tests {
 		let alloc_1 = alloc_0.shrink(size_1).unwrap();
 		assert_eq!(alloc_1.size(), size_1);
 
+		// Ensure TLB flush
+		std::thread::yield_now();
+
 		for i in 0..size_1 {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0x55));
 		}
@@ -794,6 +797,9 @@ mod tests {
 
 		// Allocation should not move
 		assert_eq!(alloc_1.inner().as_ptr::<u8>(), ptr);
+
+		// Ensure TLB flush
+		std::thread::yield_now();
 
 		for i in 0 .. size_1 {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));

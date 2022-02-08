@@ -214,6 +214,9 @@ mod tests {
 		// Allocation should not move
 		assert_eq!(alloc_0.cast::<u8>(), alloc_1.cast::<u8>());
 
+		// Ensure TLB flush
+		std::thread::yield_now();
+
 		for i in 0 .. size_1 {
 			assert_eq!(unsafe { bp.load(ptr.add(i)) }, Ok(0));
 		}
