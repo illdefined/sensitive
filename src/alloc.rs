@@ -26,7 +26,9 @@ unsafe impl Allocator for Sensitive {
 
 		if likely(!alloc.inner().is_empty()) {
 			// Attempt to lock memory
-			let _ = alloc.inner().lock();
+			#[allow(unused_must_use)] {
+				alloc.inner().lock();
+			}
 		}
 
 		Ok(alloc.into_slice())
