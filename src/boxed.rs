@@ -14,7 +14,7 @@ pub type Box<T> = Guard<InnerBox<T>>;
 impl<T> AsPages for InnerBox<T> {
 	fn as_pages(&self) -> Option<Pages> {
 		if std::mem::size_of::<T>() > 0 {
-			Some(unsafe { GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::from_ptr(&**self as *const T as *mut T, std::mem::size_of::<T>()).into_pages() })
+			Some(unsafe { GuardedAlloc::<{ Sensitive::GUARD_PAGES }>::from_ptr(std::ptr::addr_of!(**self) as *mut T, std::mem::size_of::<T>()).into_pages() })
 		} else {
 			None
 		}
