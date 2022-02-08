@@ -1,7 +1,7 @@
 //! Guarded [vector](mod@std::vec) type
 
 use crate::auxiliary::zero;
-use crate::pages::{Pages, GuardedAlloc};
+use crate::pages::{Pages, Allocation, GuardedAlloc};
 use crate::alloc::Sensitive;
 use crate::guard::{Guard, Ref, RefMut};
 use crate::traits::{AsPages, Protectable};
@@ -49,7 +49,7 @@ impl<T> Vec<T> {
 	}
 
 	pub(crate) fn with_capacity_unprotected(capacity: usize) -> Self {
-		Guard::from_inner(std::vec::Vec::with_capacity_in(capacity, Sensitive))
+		Guard::from_inner(std::vec::Vec::with_capacity_in(Allocation::align(capacity), Sensitive))
 	}
 
 	pub fn with_capacity(capacity: usize) -> Self {
