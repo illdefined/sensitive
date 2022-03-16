@@ -1,4 +1,5 @@
 #![feature(
+	adt_const_params,
 	allocator_api,
 	core_intrinsics,
 	maybe_uninit_slice,

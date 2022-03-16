@@ -7,12 +7,28 @@ use std::alloc::{Allocator, AllocError, Layout, handle_alloc_error};
 use std::intrinsics::{likely, unlikely};
 use std::ptr::NonNull;
 
-/// Allocator for sensitive information
-pub struct Sensitive;
+/// Memory locking mode
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LockingMode {
+	/// Do not attempt to lock memory
+	Neglect,
 
-impl Sensitive {
+	/// Attempt to lock memory, ignoring failure
+	Attempt,
+
+	/// Fail if memory cannot be locked
+	Enforce
+}
+
+/// Allocator for sensitive information
+pub struct Sensitive<const M: LockingMode = { LockingMode::Attempt }>;
+
+impl<const M: LockingMode> Sensitive<M> {
 	/// Number of guard pages
 	pub(crate) const GUARD_PAGES: usize = 1;
+
+	/// Memory locking mode
+	pub(crate) const LOCKING_MODE: LockingMode = M;
 }
 
 unsafe impl Allocator for Sensitive {
@@ -24,10 +40,10 @@ unsafe impl Allocator for Sensitive {
 
 		let alloc = GuardedAlloc::<{ Self::GUARD_PAGES }>::new(layout.size(), Protection::ReadWrite).map_err(|_| AllocError)?;
 
-		if likely(!alloc.inner().is_empty()) {
-			// Attempt to lock memory
-			#[allow(unused_must_use)] {
-				alloc.inner().lock();
+		if Self::LOCKING_MODE != LockingMode::Neglect && likely(!alloc.inner().is_empty()) {
+			// Lock memory
+			if alloc.inner().lock().is_err() && Self::LOCKING_MODE == LockingMode::Enforce {
+				return Err(AllocError)
 			}
 		}
 
@@ -53,9 +69,11 @@ unsafe impl Allocator for Sensitive {
 			// Zero memory before returning to OS
 			zero(ptr.as_ptr(), layout.size());
 
-			// Attempt to unlock memory
-			#[allow(unused_must_use)] {
-				alloc.inner().unlock();
+			if Self::LOCKING_MODE != LockingMode::Neglect {
+				// Unlock memory
+				if alloc.inner().unlock().is_err() && Self::LOCKING_MODE == LockingMode::Enforce {
+					handle_alloc_error(layout);
+				}
 			}
 		}
 	}
