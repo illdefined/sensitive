@@ -1,6 +1,6 @@
 [package]
 name = "sensitive"
-version = "0.9.4"
+version = "0.9.5"
 authors = ["Mikael Voss <mvs@nyantec.com>"]
 edition = "2021"
 description = "Memory allocator for sensitive information"
