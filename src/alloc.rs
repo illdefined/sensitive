@@ -52,6 +52,11 @@ unsafe impl Allocator for Sensitive {
 
 			// Zero memory before returning to OS
 			zero(ptr.as_ptr(), layout.size());
+
+			// Attempt to unlock memory
+			#[allow(unused_must_use)] {
+				alloc.inner().unlock();
+			}
 		}
 	}
 
