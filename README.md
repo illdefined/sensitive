@@ -14,7 +14,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sensitive = "0.9"
+sensitive = "0.10"
 ```
 
 The `force-mlock` feature may be used to force allocations to be memory‐resident: If the memory cannot be locked, the allocation will fail. Without this feature, locking is attempted, but failures are ignored.
