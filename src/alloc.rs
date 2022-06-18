@@ -26,8 +26,8 @@ unsafe impl Allocator for Sensitive {
 
 		if likely(!alloc.inner().is_empty()) {
 			// Attempt to lock memory
-			#[allow(unused_must_use)] {
-				alloc.inner().lock();
+			if alloc.inner().lock().is_err() && cfg!(feature = "force-mlock") {
+				return Err(AllocError);
 			}
 		}
 
@@ -54,8 +54,8 @@ unsafe impl Allocator for Sensitive {
 			zero(ptr.as_ptr(), layout.size());
 
 			// Attempt to unlock memory
-			#[allow(unused_must_use)] {
-				alloc.inner().unlock();
+			if alloc.inner().unlock().is_err() && cfg!(feature = "force-mlock") {
+				handle_alloc_error(layout);
 			}
 		}
 	}
