@@ -161,7 +161,7 @@ impl<T: Protectable + Deref> Deref for Ref<'_, T> {
 
 	#[inline]
 	fn deref(&self) -> &Self::Target {
-		&*self.0.1
+		&self.0.1
 	}
 }
 
@@ -204,7 +204,7 @@ impl<T: Protectable + Deref> Deref for RefMut<'_, T> {
 
 	#[inline]
 	fn deref(&self) -> &Self::Target {
-		&*self.0.1
+		&self.0.1
 	}
 }
 
@@ -227,7 +227,7 @@ impl<T: Protectable + Index<I> + IndexMut<I>, I> IndexMut<I> for RefMut<'_, T> {
 impl<T: Protectable + Deref + DerefMut> DerefMut for RefMut<'_, T> {
 	#[inline]
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut *self.0.1
+		&mut self.0.1
 	}
 }
 
