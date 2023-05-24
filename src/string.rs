@@ -219,7 +219,7 @@ impl RefMut<'_> {
 	}
 
 	pub fn pop(&mut self) -> Option<char> {
-		let ch = self.chars().rev().next()?;
+		let ch = self.chars().next_back()?;
 		unsafe { self.0.0.set_len(self.0.len() - ch.len_utf8()); }
 		unsafe { zero(self.0.as_mut_ptr().add(self.0.len()), ch.len_utf8()); }
 		Some(ch)
