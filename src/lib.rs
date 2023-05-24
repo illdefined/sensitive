@@ -2,7 +2,6 @@
 	allocator_api,
 	core_intrinsics,
 	maybe_uninit_slice,
-	nonnull_slice_from_raw_parts,
 	slice_ptr_get,
 	slice_ptr_len,
 )]
