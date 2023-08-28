@@ -1,6 +1,5 @@
 //! Memory page functions
 
-use crate::auxiliary::align;
 use crate::traits::{AsPages, Protectable};
 
 use std::convert::TryInto;
@@ -105,7 +104,7 @@ impl<'t> Pages<'t> {
 
 	#[must_use]
 	pub fn align(offset: usize) -> usize {
-		align(offset, Self::granularity())
+		offset.next_multiple_of(Self::granularity())
 	}
 
 	/// Create [`Pages`] from [non‐null](NonNull) raw [`u8`] slice
@@ -266,7 +265,7 @@ impl Allocation {
 
 	#[must_use]
 	pub fn align(offset: usize) -> usize {
-		align(offset, Self::granularity())
+		offset.next_multiple_of(Self::granularity())
 	}
 
 	/// Create [`Allocation`] from [non‐null](NonNull) raw [`u8`] slice
@@ -551,11 +550,9 @@ impl<T: AsPages> Protectable for T {
 mod tests {
 	use super::*;
 
-	use crate::auxiliary::is_power_of_two;
-
 	#[test]
 	fn page_size() {
-		assert!(is_power_of_two(Pages::granularity()));
+		assert!(Pages::granularity().is_power_of_two());
 
 		// No modern architecture has a page size < 4096 bytes
 		assert!(Pages::granularity() >= 4096);
@@ -563,7 +560,7 @@ mod tests {
 
 	#[test]
 	fn alloc_size() {
-		assert!(is_power_of_two(Allocation::granularity()));
+		assert!(Allocation::granularity().is_power_of_two());
 		assert!(Allocation::granularity() >= Pages::granularity());
 		assert_eq!(Pages::align(Allocation::granularity()), Allocation::granularity());
 	}
