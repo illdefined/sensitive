@@ -558,6 +558,18 @@ mod tests {
 
 		// No modern architecture has a page size < 4096 bytes
 		assert!(Pages::granularity() >= 4096);
+
+		#[cfg(target_arch = "riscv64")]
+		assert_eq!(Pages::granularity() == 4096
+			|| Pages::granularity() == 65536);
+
+		#[cfg(target_arch = "aarch64")]
+		assert!(Pages::granularity() == 4096
+			|| Pages::granularity() == 16384
+			|| Pages::granularity() == 65536);
+
+		#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+		assert_eq!(Pages::granularity(), 4096);
 	}
 
 	#[test]
