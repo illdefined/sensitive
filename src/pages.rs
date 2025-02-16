@@ -2,6 +2,7 @@
 
 use crate::traits::{AsPages, Protectable};
 
+use std::cell::SyncUnsafeCell;
 use std::convert::TryInto;
 use std::intrinsics::likely;
 use std::io::Error;
@@ -9,7 +10,7 @@ use std::marker::PhantomData;
 use std::mem::{MaybeUninit, ManuallyDrop};
 use std::ops::Range;
 use std::ptr::{self, NonNull};
-use std::sync::Once;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(windows)]
 use winapi::um::winnt;
@@ -64,42 +65,44 @@ pub struct Allocation(NonNull<[u8]>);
 #[derive(Debug)]
 pub struct GuardedAlloc<const N: usize = 1>(Allocation);
 
-static INIT: Once = Once::new();
-
-static mut PAGE_SIZE: MaybeUninit<usize> = MaybeUninit::uninit();
+/// Memory page size
+static PAGE_SIZE: MaybeUninit<SyncUnsafeCell<AtomicUsize>> = MaybeUninit::uninit();
 
 #[cfg(windows)]
-static mut GRANULARITY: MaybeUninit<usize> = MaybeUninit::uninit();
+/// Allocation granularity
+static GRANULARITY: MaybeUninit<SyncUnsafeCell<AtomicUsize>> = MaybeUninit::uninit();
 
+#[ctor::ctor]
 fn init() {
-	#[cfg(unix)]
-	INIT.call_once(|| {
+	#[cfg(unix)] {
 		use libc::{sysconf, _SC_PAGESIZE};
 
 		let pg = unsafe { sysconf(_SC_PAGESIZE) };
 		assert!(pg > 0);
 
-		unsafe { PAGE_SIZE.write(pg.try_into().unwrap()); }
-	});
+		unsafe { SyncUnsafeCell::raw_get(PAGE_SIZE.as_ptr()).as_ref_unchecked() }
+			.store(pg.try_into().unwrap(), Ordering::SeqCst);
+	};
 
-	#[cfg(windows)]
-	INIT.call_once(|| {
+	#[cfg(windows)] {
 		use winapi::um::sysinfoapi::{SYSTEM_INFO, GetSystemInfo};
 
 		let mut si = MaybeUninit::<SYSTEM_INFO>::uninit();
 		unsafe { GetSystemInfo(si.as_mut_ptr()); }
 
-		unsafe { PAGE_SIZE.write(si.assume_init().dwPageSize.try_into().unwrap()) };
-		unsafe { GRANULARITY.write(si.assume_init().dwAllocationGranularity.try_into().unwrap()) };
-	});
+		unsafe { SyncUnsafeCell::raw_get(PAGE_SIZE.as_ptr()).as_ref_unchecked() }
+			.store(unsafe { si.assume_init() }.dwPageSize.try_into().unwrap(), Ordering::SeqCst);
+
+		unsafe { SyncUnsafeCell::raw_get(GRANULARITY.as_ptr()).as_ref_unchecked() }
+			.store(unsafe { si.assume_init() }.dwAllocationGranularity.try_into().unwrap(), Ordering::SeqCst);
+	};
 }
 
 impl<'t> Pages<'t> {
 	#[must_use]
 	pub fn granularity() -> usize {
-		init();
-
-		unsafe { PAGE_SIZE.assume_init() }
+		unsafe { SyncUnsafeCell::raw_get(PAGE_SIZE.as_ptr()).as_ref_unchecked() }
+			.load(Ordering::Relaxed)
 	}
 
 	#[must_use]
@@ -257,9 +260,8 @@ impl Allocation {
 		}
 
 		#[cfg(windows)] {
-			init();
-
-			unsafe { GRANULARITY.assume_init() }
+			unsafe { SyncUnsafeCell::raw_get(GRANULARITY.as_ptr()).as_ref_unchecked() }
+				.load(Ordering::Relaxed)
 		}
 	}
 
