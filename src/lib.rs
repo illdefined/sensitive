@@ -1,3 +1,4 @@
+#![allow(internal_features)]
 #![feature(
 	allocator_api,
 	core_intrinsics,
