@@ -3,7 +3,6 @@
 	core_intrinsics,
 	maybe_uninit_slice,
 	slice_ptr_get,
-	slice_ptr_len,
 )]
 
 pub mod auxiliary;
