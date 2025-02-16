@@ -567,10 +567,10 @@ mod tests {
 
 	fn raw_range(range: std::ops::Range<usize>, samples: usize) {
 		use rand::SeedableRng;
-		use rand::distributions::{Distribution, Uniform};
+		use rand::distr::{Distribution, Uniform};
 
-		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_entropy();
-		let dist = Uniform::from(range);
+		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_os_rng();
+		let dist = Uniform::try_from(range).unwrap();
 
 		for _ in 0..samples {
 			let size = dist.sample(&mut rng);
@@ -688,10 +688,10 @@ mod tests {
 
 	fn guarded_range(range: std::ops::Range<usize>, samples: usize) {
 		use rand::SeedableRng;
-		use rand::distributions::{Distribution, Uniform};
+		use rand::distr::{Distribution, Uniform};
 
-		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_entropy();
-		let dist = Uniform::from(range);
+		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_os_rng();
+		let dist = Uniform::try_from(range).unwrap();
 
 		for _ in 0..samples {
 			let size = dist.sample(&mut rng);

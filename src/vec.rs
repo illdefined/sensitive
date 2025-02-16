@@ -355,13 +355,13 @@ mod tests {
 
 		const LIMIT: usize = 1048576;
 
-		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_entropy();
+		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_os_rng();
 		let mut test: Vec<u8> = Vec::new();
 
 		let mut mutable = test.borrow_mut();
 
 		for i in 0..LIMIT {
-			let rand = rng.gen();
+			let rand = rng.random();
 
 			mutable.push(rand);
 			assert_eq!(mutable[i], rand);

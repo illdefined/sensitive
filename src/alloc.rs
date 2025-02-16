@@ -103,10 +103,10 @@ mod tests {
 
 	fn raw_range(range: std::ops::Range<usize>, samples: usize) {
 		use rand::SeedableRng;
-		use rand::distributions::{Distribution, Uniform};
+		use rand::distr::{Distribution, Uniform};
 
-		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_entropy();
-		let dist = Uniform::from(range);
+		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_os_rng();
+		let dist = Uniform::try_from(range).unwrap();
 
 		for _ in 0..samples {
 			let size = dist.sample(&mut rng);
@@ -255,11 +255,11 @@ mod tests {
 
 		const LIMIT: usize = 1048576;
 
-		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_entropy();
+		let mut rng = rand_xoshiro::Xoshiro256PlusPlus::from_os_rng();
 		let mut test: Vec<u8, _> = Vec::new_in(Sensitive);
 
 		for i in 0..LIMIT {
-			let rand = rng.gen();
+			let rand = rng.random();
 
 			test.push(rand);
 			assert_eq!(test[i], rand);
