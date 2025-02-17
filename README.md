@@ -22,3 +22,10 @@ The `force-mlock` feature may be used to force allocations to be memory‐reside
 ## Implementation notes
 
 This code relies heavily on experimental nightly‐only APIs.
+
+## Intellectual property
+
+This work is dedicated to the public domain under the terms of the
+[CC0 1.0 licence](https://creativecommons.org/publicdomain/zero/1.0/).
+
+The author holds no patent rights related to this work.
