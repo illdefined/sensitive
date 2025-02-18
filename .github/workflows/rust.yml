@@ -1,0 +1,183 @@
+name: Rust build
+
+on:
+  - push
+  - pull_request
+  - workflow_dispatch
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TERM_UNICODE: true
+  CARGO_TERM_VERBOSE: true
+  RUST_BACKTRACE: 1
+
+jobs:
+  lint:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt update
+          sudo apt install clang lld {libc,libssl}-dev
+
+          cat >>"${GITHUB_ENV}" <<EOF
+          CC=clang
+          LD=ld.lld
+          EOF
+
+          mkdir -p ~/.cargo
+          cat >~/.cargo/config.toml <<EOF
+          [build]
+          rustflags = [
+            "-C", "linker=clang",
+            "-C", "link-arg=-fuse-ld=lld"
+          ]
+          EOF
+      - run: |
+          rustup update
+          rustup default nightly
+          rustup component add clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "global"
+      - run: cargo clippy --all-targets --all-features
+  
+  build-native:
+    name: Build Native
+    strategy:
+      matrix:
+        system:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-13
+          - windows-latest
+
+    runs-on: ${{ matrix.system }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt update
+          sudo apt install clang lld {libc,musl,libssl}-dev
+          
+          cat >>"${GITHUB_ENV}" <<EOF
+          CC=clang
+          LD=ld.lld
+          EOF
+          
+          mkdir -p ~/.cargo
+          cat >~/.cargo/config.toml <<EOF
+          [build]
+          rustflags = [
+            "-C", "linker=clang",
+            "-C", "link-arg=-fuse-ld=lld"
+          ]
+          EOF
+        if: ${{ runner.os == 'Linux' }}
+      - run: |
+          brew update
+          brew install llvm lld openssl
+          
+          cat >>"${GITHUB_ENV}" <<EOF
+          CC=$(brew --prefix llvm)/bin/clang
+          LD=$(brew --prefix lld)/bin/lld
+          EOF
+          
+          mkdir -p .cargo
+          cat >~/.cargo/config.toml <<EOF
+          [build]
+          rustflags = [
+            "-C", "linker=$(brew --prefix llvm)/bin/clang",
+            "-C", "link-arg=-fuse-ld=lld"
+          ]
+          EOF
+        if: ${{ runner.os == 'Darwin' }}
+      - run: |
+          choco install llvm openssl
+        if: ${{ runner.os == 'Windows' }}
+      - run: |
+          rustup update
+          rustup default nightly
+      - run: |
+          rustup target add x86_64-unknown-linux-gnu x86_64-unknown-linux-musl
+          cat >>~/.cargo/config.toml <<EOF
+          target = [
+            "x86_64-unknown-linux-gnu",
+            "x86_64-unknown-linux-musl"
+          ]
+          EOF
+        if: ${{ runner.os == 'Linux' && runner.arch == 'X64' }}
+      - run: |
+          rustup target add aarch64-unknown-linux-gnu aarch64-unknown-linux-musl
+          cat >>~/.cargo/config.toml <<EOF
+          target = [
+            "aarch64-unknown-linux-gnu",
+            "aarch64-unknown-linux-musl"
+          ]
+          EOF
+        if: ${{ runner.os == 'Linux' && runner.arch == 'ARM64' }}
+      - run: |
+          rustup target add x86_64-pc-windows-gnu x86_64-pc-windows-gnullvm x86_64-pc-windows-msvc
+          @"
+          [build]
+          target = [
+            "x86_64-pc-windows-gnu",
+            "x86_64-pc-windows-gnullvm",
+            "x86_64-pc-windows-msvc"
+          ]
+          "@ >>~/.cargo/config.toml
+        if: ${{ runner.os == 'Windows' && runner.arch == 'X64' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "global"
+      - run: cargo test
+      - run: cargo build --release
+
+  build-riscv:
+    name: Build RISC-V
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          release="$(lsb_release --short --codename)"
+          
+          sudo dpkg --add-architecture riscv64          
+          sudo add-apt-repository "deb [arch=riscv64] http://azure.ports.ubuntu.com/ubuntu-ports/ ${release} main"
+          
+          sudo apt update
+          sudo apt install clang lld qemu-user-binfmt {libc,musl,libssl}-dev:riscv64
+          
+          cat >>"${GITHUB_ENV}" <<EOF
+          CC=clang
+          LD=ld.lld
+          EOF
+      - run: |
+          rustup update
+          rustup default nightly
+          rustup target add riscv64gc-unknown-linux-gnu riscv64gc-unknown-linux-musl
+      - run: |
+          mkdir -p .cargo
+          cat >~/.cargo/config.toml <<EOF
+          [build]
+          rustflags = [
+            "-C", "linker=clang",
+            "-C", "link-arg=-fuse-ld=lld"
+          ]
+
+          target = [
+            "riscv64gc-unknown-linux-musl",
+            "riscv64gc-unknown-linux-gnu"
+          ]
+
+          [target.x86_64-unknown-linux-gnu]
+          rustflags = [
+            "-C", "linker=clang",
+            "-C", "link-arg=-fuse-ld=lld"
+          ]
+          EOF
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "global"
+      - run: cargo test
+      - run: cargo build --target --release

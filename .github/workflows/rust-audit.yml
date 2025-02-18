@@ -1,0 +1,47 @@
+name: Rust audit
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TERM_UNICODE: true
+  CARGO_TERM_VERBOSE: true
+  RUST_BACKTRACE: 1
+
+on:
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  schedule:
+    - cron: '0 0 * * MON'
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt update
+          sudo apt install clang lld {libc,openssl}-dev
+
+          cat >>"${GITHUB_ENV}" <<EOF
+          CC=clang
+          LD=ld.lld
+          EOF
+
+          mkdir -p .cargo
+          cat >~/.cargo/config.toml <<EOF
+          [build]
+          rustflags = [
+            "-C", "linker=clang",
+            "-C", "link-arg=-fuse-ld=lld"
+          ]
+          EOF
+      - run: |
+          rustup update
+          rustup default nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "global"
+      - run: cargo install --locked cargo-audit
+      - run: cargo audit
